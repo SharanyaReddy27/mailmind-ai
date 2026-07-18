@@ -2,7 +2,12 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const connectDB = require("./config/db");
+const emailRoutes = require("./routes/emailRoutes");
+
 const app = express();
+
+connectDB();
 
 app.use(
   cors({
@@ -25,39 +30,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.get("/api/emails", (req, res) => {
-  const emails = [
-    {
-      id: 1,
-      senderName: "Rahul Kumar",
-      senderEmail: "rahul@example.com",
-      subject: "Project meeting",
-      snippet: "Can we schedule the project discussion tomorrow?",
-      priority: "High",
-      unread: true,
-    },
-    {
-      id: 2,
-      senderName: "Placement Cell",
-      senderEmail: "placement@college.edu",
-      subject: "Internship opportunity",
-      snippet: "Applications are open for the software internship.",
-      priority: "Medium",
-      unread: true,
-    },
-    {
-      id: 3,
-      senderName: "Amazon",
-      senderEmail: "orders@amazon.in",
-      subject: "Your order has been shipped",
-      snippet: "Your package is on the way.",
-      priority: "Low",
-      unread: false,
-    },
-  ];
-
-  res.json(emails);
-});
+app.use("/api/emails", emailRoutes);
 
 const PORT = process.env.PORT || 5000;
 
