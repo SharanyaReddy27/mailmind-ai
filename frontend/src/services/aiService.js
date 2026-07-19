@@ -1,0 +1,43 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+const buildPayload = (email) => ({
+  subject: email?.subject || "",
+  sender: email?.senderName || email?.sender || email?.senderEmail || "",
+  body: email?.body || email?.content || email?.message || "",
+});
+
+const requestJson = async (endpoint, payload) => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.message || "Unable to process this email.");
+  }
+
+  return data;
+};
+
+export const summarizeEmail = async (email) => {
+  const payload = buildPayload(email);
+  const data = await requestJson("/api/ai/summarize", payload);
+  return data.summary;
+};
+
+export const generateReply = async (email) => {
+  const payload = buildPayload(email);
+  const data = await requestJson("/api/ai/reply", payload);
+  return data.reply;
+};
+
+export const extractTasks = async (email) => {
+  const payload = buildPayload(email);
+  const data = await requestJson("/api/ai/tasks", payload);
+  return Array.isArray(data.tasks) ? data.tasks : [];
+};

@@ -33,7 +33,7 @@ function Inbox() {
       {error && <p>{error}</p>}
 
       {emails.map((email) => (
-        <EmailCard key={email.id} email={email} />
+        <EmailCard key={email._id || email.id} email={email} />
       ))}
     </div>
   );
