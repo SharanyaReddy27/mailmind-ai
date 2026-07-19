@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const connectDB = require("./config/db");
 const emailRoutes = require("./routes/emailRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 
 const app = express();
 
@@ -25,12 +26,13 @@ app.get("/", (req, res) => {
 
 app.get("/api/health", (req, res) => {
   res.json({
-    status: "success",
-    message: "Frontend successfully connected to backend",
+    success: true,
+    message: "MailMind backend is running",
   });
 });
 
 app.use("/api/emails", emailRoutes);
+app.use("/api/ai", aiRoutes);
 
 const PORT = process.env.PORT || 5000;
 
