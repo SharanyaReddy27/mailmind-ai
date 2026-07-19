@@ -72,3 +72,43 @@ export const getCurrentUser = async () => {
 };
 
 export default api;
+
+export const getGmailAuthUrl = async () => {
+  try {
+    const res = await api.get('/gmail/auth-url');
+    return res.data;
+  } catch (err) {
+    const message = err?.response?.data?.message || 'Unable to get Gmail auth URL';
+    throw new Error(message);
+  }
+};
+
+export const getGmailStatus = async () => {
+  try {
+    const res = await api.get('/gmail/status');
+    return res.data;
+  } catch (err) {
+    const message = err?.response?.data?.message || 'Unable to get Gmail status';
+    throw new Error(message);
+  }
+};
+
+export const syncGmail = async (limit = 20) => {
+  try {
+    const res = await api.post('/gmail/sync', { limit });
+    return res.data;
+  } catch (err) {
+    const message = err?.response?.data?.message || 'Unable to sync Gmail';
+    throw new Error(message);
+  }
+};
+
+export const disconnectGmail = async () => {
+  try {
+    const res = await api.post('/gmail/disconnect');
+    return res.data;
+  } catch (err) {
+    const message = err?.response?.data?.message || 'Unable to disconnect Gmail';
+    throw new Error(message);
+  }
+};

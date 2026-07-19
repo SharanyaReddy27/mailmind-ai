@@ -6,6 +6,7 @@ const connectDB = require("./config/db");
 const emailRoutes = require('./routes/emailRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const authRoutes = require('./routes/authRoutes');
+const gmailRoutes = require('./routes/gmailRoutes');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/gmail', gmailRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/ai', aiRoutes);
 

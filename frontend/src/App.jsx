@@ -29,6 +29,7 @@ function AppShell() {
           {currentUser ? (
             <>
               <Link to="/dashboard">Dashboard</Link>
+              <Link to="/settings">Settings</Link>
               <Link to="/inbox">Inbox</Link>
               <span className="nav-user">👤 {currentUser.name || currentUser.email || "User"}</span>
               <button type="button" className="nav-logout" onClick={logout}>
