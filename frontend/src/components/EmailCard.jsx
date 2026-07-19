@@ -1,19 +1,29 @@
+import { Link } from "react-router-dom";
+
 function EmailCard({ email }) {
   return (
-    <div className="email-card">
-      <div>
-        <h3>{email.senderName}</h3>
-        <p>{email.senderEmail}</p>
-      </div>
+    <Link
+      to={`/emails/${email._id}`}
+      className="email-card-link"
+    >
+      <article className={`email-card ${email.unread ? "unread" : ""}`}>
+        <div className="email-header">
+          <div>
+            <h3>{email.senderName}</h3>
+            <p>{email.senderEmail}</p>
+          </div>
 
-      <h4>{email.subject}</h4>
-      <p>{email.snippet}</p>
+          <span className={`priority ${email.priority.toLowerCase()}`}>
+            {email.priority}
+          </span>
+        </div>
 
-      <div className="email-info">
-        <span>Priority: {email.priority}</span>
+        <h4>{email.subject}</h4>
+        <p>{email.snippet}</p>
+
         <span>{email.unread ? "Unread" : "Read"}</span>
-      </div>
-    </div>
+      </article>
+    </Link>
   );
 }
 
