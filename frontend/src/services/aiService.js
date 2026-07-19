@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+const buildUrl = (endpoint) => {
+  const normalizedBase = API_BASE_URL ? API_BASE_URL.replace(/\/$/, "") : "";
+  return `${normalizedBase}${endpoint}`;
+};
 
 const buildPayload = (email) => ({
   subject: email?.subject || "",
@@ -7,7 +12,7 @@ const buildPayload = (email) => ({
 });
 
 const requestJson = async (endpoint, payload) => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(buildUrl(endpoint), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
