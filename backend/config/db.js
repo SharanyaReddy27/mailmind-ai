@@ -9,7 +9,9 @@ const connectDB = async () => {
     );
   } catch (error) {
     console.error(`MongoDB connection failed: ${error.message}`);
-    process.exit(1);
+    // Do not exit process here to allow the server to run in demo/fallback mode
+    // The application can still operate with demo emails when MongoDB is unavailable.
+    return;
   }
 };
 

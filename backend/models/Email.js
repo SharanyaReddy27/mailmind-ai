@@ -74,9 +74,7 @@ const emailSchema = new mongoose.Schema(
   }
 );
 
-const Email = mongoose.model("Email", emailSchema);
-
 // compound unique index to prevent duplicate Gmail messages per user
 emailSchema.index({ userId: 1, source: 1, externalMessageId: 1 }, { unique: true, sparse: true });
 
-module.exports = Email;
+module.exports = mongoose.models.Email || mongoose.model("Email", emailSchema);
