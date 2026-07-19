@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getErrorMessage, healthCheck } from "../services/api";
+import api from "../services/api";
 
 function Dashboard() {
   const [backendMessage, setBackendMessage] = useState(
@@ -7,12 +7,13 @@ function Dashboard() {
   );
 
   useEffect(() => {
-    healthCheck()
+    api
+      .get("/health")
       .then((response) => {
         setBackendMessage(response.data.message);
       })
-      .catch((err) => {
-        setBackendMessage(getErrorMessage(err));
+      .catch(() => {
+        setBackendMessage("Backend is not connected");
       });
   }, []);
 

@@ -12,7 +12,24 @@ connectDB();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow browser dev servers on localhost (any port) and 127.0.0.1
+      if (!origin) return callback(null, true);
+      try {
+        const u = new URL(origin);
+        if (
+          (u.hostname === "localhost" || u.hostname === "127.0.0.1") &&
+          (u.protocol === "http:" || u.protocol === "https:")
+        ) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // fall through to disallow
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 

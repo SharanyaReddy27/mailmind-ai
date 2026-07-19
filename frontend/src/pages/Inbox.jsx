@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getEmails, getErrorMessage } from "../services/api";
+import api from "../services/api";
 import EmailCard from "../components/EmailCard";
 
 function Inbox() {
@@ -8,13 +8,14 @@ function Inbox() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getEmails()
+    api
+      .get("/emails")
       .then((response) => {
         setEmails(response.data);
         setError("");
       })
-      .catch((err) => {
-        setError(getErrorMessage(err));
+      .catch(() => {
+        setError("Backend is not connected.");
       })
       .finally(() => {
         setLoading(false);
@@ -32,7 +33,7 @@ function Inbox() {
       {error && <p>{error}</p>}
 
       {emails.map((email) => (
-        <EmailCard key={email._id || email.id} email={email} />
+        <EmailCard key={email.id} email={email} />
       ))}
     </div>
   );
