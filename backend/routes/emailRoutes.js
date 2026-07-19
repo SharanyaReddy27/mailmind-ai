@@ -6,14 +6,15 @@ const {
   createEmail,
   updateEmail,
   deleteEmail,
-} = require("../controllers/emailController");
+} = require('../controllers/emailController');
+const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
 
-router.post("/seed", seedEmails);
-router.get("/", getEmails);
-router.get("/:id", getEmailById);
-router.post("/", createEmail);
-router.put("/:id", updateEmail);
-router.delete("/:id", deleteEmail);
+router.post('/seed', seedEmails);
+router.get('/', protect, getEmails);
+router.get('/:id', protect, getEmailById);
+router.post('/', protect, createEmail);
+router.put('/:id', protect, updateEmail);
+router.delete('/:id', protect, deleteEmail);
 
 module.exports = router;

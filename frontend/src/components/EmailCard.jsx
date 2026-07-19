@@ -1,137 +1,52 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 
 function EmailCard({ email }) {
-  const [summary, setSummary] = useState("");
-  const [reply, setReply] = useState("");
-  const [tasks, setTasks] = useState([]);
+  const senderName = email.senderName || email.sender || "Unknown sender";
+  const senderEmail = email.senderEmail || email.email || "";
+  const preview =
+    email.snippet || email.body || email.message || "No email content available.";
+  const receivedAt = email.receivedAt || email.date || email.createdAt || "";
+  const priority = (email.priority || "Medium").toLowerCase();
+  const readStatus = email.unread || email.isRead === false ? "Unread" : "Read";
 
-  const handleSummarize = (event) => {
-    event.preventDefault();
+  const formatDate = (value) => {
+    if (!value) {
+      return "No date";
+    }
 
-    setSummary(
-      `${email.subject}: ${
-        email.body ||
-        email.message ||
-        email.snippet ||
-        "No email content available."
-      }`
-    );
-  };
+    const dateValue = new Date(value);
 
-  const handleGenerateReply = (event) => {
-    event.preventDefault();
+    if (Number.isNaN(dateValue.getTime())) {
+      return value;
+    }
 
-    setReply(
-      `Hello ${
-        email.senderName || email.sender || "there"
-      },\n\nThank you for your email regarding "${
-        email.subject
-      }". I will review it and get back to you soon.\n\nRegards`
-    );
-  };
-
-  const handleExtractTasks = (event) => {
-    event.preventDefault();
-
-    const text =
-      email.body || email.message || email.snippet || "";
-
-    const extractedTasks = text
-      .split(".")
-      .map((sentence) => sentence.trim())
-      .filter(
-        (sentence) =>
-          sentence.toLowerCase().includes("please") ||
-          sentence.toLowerCase().includes("schedule") ||
-          sentence.toLowerCase().includes("complete") ||
-          sentence.toLowerCase().includes("submit") ||
-          sentence.toLowerCase().includes("apply")
-      );
-
-    setTasks(
-      extractedTasks.length > 0
-        ? extractedTasks
-        : ["No specific tasks found."]
-    );
+    return dateValue.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   return (
     <article className={`email-card ${email.unread ? "unread" : ""}`}>
-      <Link
-        to={`/emails/${email._id}`}
-        className="email-card-link"
-      >
+      <Link to={`/emails/${email._id}`} className="email-card-link">
         <div className="email-header">
           <div>
-            <h3>{email.senderName || email.sender}</h3>
-            <p>{email.senderEmail || email.email}</p>
+            <h3>{senderName}</h3>
+            {senderEmail && <p>{senderEmail}</p>}
           </div>
 
-          {email.priority && (
-            <span
-              className={`priority ${email.priority.toLowerCase()}`}
-            >
-              {email.priority}
-            </span>
-          )}
+          {email.priority && <span className={`priority ${priority}`}>{email.priority}</span>}
         </div>
 
         <h4>{email.subject}</h4>
+        <p className="preview-text">{preview}</p>
 
-        <p>
-          {email.snippet ||
-            email.body ||
-            email.message ||
-            "No email content available."}
-        </p>
-
-        <span>
-          {email.unread || email.isRead === false
-            ? "Unread"
-            : "Read"}
-        </span>
+        <div className="email-meta">
+          <span>{formatDate(receivedAt)}</span>
+          <span className={`status-pill ${readStatus.toLowerCase()}`}>{readStatus}</span>
+        </div>
       </Link>
-
-      <div className="email-actions">
-        <button onClick={handleSummarize}>
-          Summarize
-        </button>
-
-        <button onClick={handleGenerateReply}>
-          Generate Reply
-        </button>
-
-        <button onClick={handleExtractTasks}>
-          Extract Tasks
-        </button>
-      </div>
-
-      {summary && (
-        <div className="result-box">
-          <h4>Summary</h4>
-          <p>{summary}</p>
-        </div>
-      )}
-
-      {reply && (
-        <div className="result-box">
-          <h4>Generated Reply</h4>
-          <pre>{reply}</pre>
-        </div>
-      )}
-
-      {tasks.length > 0 && (
-        <div className="result-box">
-          <h4>Extracted Tasks</h4>
-
-          <ul>
-            {tasks.map((task, index) => (
-              <li key={index}>{task}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </article>
   );
 }

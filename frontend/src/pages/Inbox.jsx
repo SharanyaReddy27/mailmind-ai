@@ -1,40 +1,68 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 import EmailCard from "../components/EmailCard";
+import ErrorMessage from "../components/ErrorMessage";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 function Inbox() {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadEmails = () => {
+    setLoading(true);
     api
       .get("/emails")
       .then((response) => {
-        setEmails(response.data);
+        setEmails(response.data || []);
         setError("");
       })
       .catch(() => {
-        setError("Backend is not connected.");
+        setError("Unable to connect to backend.");
       })
       .finally(() => {
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    loadEmails();
   }, []);
 
   if (loading) {
-    return <p>Loading emails...</p>;
+    return (
+      <div className="page-shell">
+        <LoadingSpinner label="Loading inbox..." />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <h1>MailMind Inbox</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1>MailMind Inbox</h1>
+          <p>Your latest messages in one place.</p>
+        </div>
+        <div className="page-header-actions">
+          <button type="button" className="refresh-button" onClick={loadEmails}>
+            Refresh
+          </button>
+          <span className="pill">{emails.length} emails</span>
+        </div>
+      </div>
 
-      {error && <p>{error}</p>}
+      {error && <ErrorMessage title="Connection issue" message={error} />}
 
-      {emails.map((email) => (
-        <EmailCard key={email.id} email={email} />
-      ))}
+      {!error && emails.length === 0 && (
+        <div className="empty-state">No emails found.</div>
+      )}
+
+      <div className="inbox-grid">
+        {emails.map((email) => (
+          <EmailCard key={email._id || email.id} email={email} />
+        ))}
+      </div>
     </div>
   );
 }

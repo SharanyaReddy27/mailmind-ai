@@ -32,7 +32,9 @@ const demoEmails = [
 ];
 const createEmail = async (req, res) => {
   try {
-    const email = await Email.create(req.body);
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const payload = Object.assign({}, req.body, { userId: req.user._id });
+    const email = await Email.create(payload);
     res.status(201).json(email);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -40,14 +42,15 @@ const createEmail = async (req, res) => {
 };
 const updateEmail = async (req, res) => {
   try {
-    const email = await Email.findByIdAndUpdate(
-      req.params.id,
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const email = await Email.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
       req.body,
       { new: true }
     );
 
     if (!email) {
-      return res.status(404).json({ message: "Email not found" });
+      return res.status(404).json({ message: 'Email not found' });
     }
 
     res.json(email);
@@ -57,25 +60,27 @@ const updateEmail = async (req, res) => {
 };
 const deleteEmail = async (req, res) => {
   try {
-    const email = await Email.findByIdAndDelete(req.params.id);
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const email = await Email.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
 
     if (!email) {
-      return res.status(404).json({ message: "Email not found" });
+      return res.status(404).json({ message: 'Email not found' });
     }
 
-    res.json({ message: "Email deleted successfully" });
+    res.json({ message: 'Email deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 const getEmails = async (req, res) => {
   try {
-    const emails = await Email.find().sort({ receivedAt: -1 });
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    const emails = await Email.find({ userId: req.user._id }).sort({ receivedAt: -1 });
 
     res.status(200).json(emails);
   } catch (error) {
     res.status(500).json({
-      message: "Unable to retrieve emails",
+      message: 'Unable to retrieve emails',
       error: error.message,
     });
   }
@@ -93,10 +98,8 @@ const getEmailById = async (req, res) => {
 
     const email = await Email.findById(id);
 
-    if (!email) {
-      return res.status(404).json({
-        message: "Email not found",
-      });
+    if (!email || !email.userId || email.userId.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ message: 'Email not found' });
     }
 
     res.status(200).json(email);

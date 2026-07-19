@@ -3,8 +3,9 @@ const cors = require("cors");
 require("dotenv").config();
 
 const connectDB = require("./config/db");
-const emailRoutes = require("./routes/emailRoutes");
-const aiRoutes = require("./routes/aiRoutes");
+const emailRoutes = require('./routes/emailRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -48,11 +49,16 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.use("/api/emails", emailRoutes);
-app.use("/api/ai", aiRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/emails', emailRoutes);
+app.use('/api/ai', aiRoutes);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`MailMind server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`MailMind server running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
