@@ -11,11 +11,18 @@ const buildPayload = (email) => ({
   body: email?.body || email?.content || email?.message || "",
 });
 
+// ADD THIS
+const buildAuthHeaders = () => {
+  const token = localStorage.getItem("mailmind_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const requestJson = async (endpoint, payload) => {
   const response = await fetch(buildUrl(endpoint), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...buildAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });

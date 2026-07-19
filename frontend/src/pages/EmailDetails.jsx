@@ -74,7 +74,8 @@ function EmailDetails() {
       }
     } catch (requestError) {
       setError(
-        requestError.message || "AI request failed. Make sure the backend is running."
+        requestError.message ||
+          "AI request failed. Make sure the backend is running."
       );
       setSummary("");
       setGeneratedReply("");
@@ -117,7 +118,10 @@ function EmailDetails() {
   if (!email) {
     return (
       <div className="page-shell">
-        <ErrorMessage title="Email not found" message="The requested email could not be found." />
+        <ErrorMessage
+          title="Email not found"
+          message="The requested email could not be found."
+        />
       </div>
     );
   }
@@ -125,12 +129,14 @@ function EmailDetails() {
   const priorityClass = (email.priority || "medium").toLowerCase();
   const body = email.body || email.content || email.message || "";
   const receivedAt = email.receivedAt || email.date || email.createdAt || "";
+
   const formatDate = (value) => {
     if (!value) {
       return "No date";
     }
 
     const dateValue = new Date(value);
+
     if (Number.isNaN(dateValue.getTime())) {
       return value;
     }
@@ -143,20 +149,31 @@ function EmailDetails() {
 
   return (
     <section className="email-details">
-      <Link to="/inbox" className="back-link">← Back to Inbox</Link>
+      <Link to="/inbox" className="back-link">
+        ← Back to Inbox
+      </Link>
 
       <div className="email-details-header">
         <div>
           <h1>{email.subject}</h1>
+
           <p>
-            From: {email.senderName || email.sender || email.senderEmail || "Unknown sender"}
+            From:{" "}
+            {email.senderName ||
+              email.sender ||
+              email.senderEmail ||
+              "Unknown sender"}
           </p>
+
           <p>To: {email.recipient || email.to || "Unknown recipient"}</p>
+
           <p className="detail-meta">{formatDate(receivedAt)}</p>
         </div>
 
         {email.priority && (
-          <span className={`priority ${priorityClass}`}>{email.priority}</span>
+          <span className={`priority ${priorityClass}`}>
+            {email.priority}
+          </span>
         )}
       </div>
 
@@ -173,7 +190,9 @@ function EmailDetails() {
           onClick={() => handleAction("summarize")}
           disabled={activeAction === "summarize"}
         >
-          {activeAction === "summarize" ? "Summarizing..." : "Summarize"}
+          {activeAction === "summarize"
+            ? "📝 Summarizing..."
+            : "📝 Summarize"}
         </button>
 
         <button
@@ -193,11 +212,19 @@ function EmailDetails() {
         </button>
       </div>
 
-      {error && <ErrorMessage title="AI request failed" message={error} />}
+      {error && (
+        <ErrorMessage title="AI request failed" message={error} />
+      )}
 
       <div className="results-stack">
         <SummaryCard title="AI Summary" content={summary} />
-        <ReplyCard reply={generatedReply} copied={copied} onCopy={handleCopyReply} />
+
+        <ReplyCard
+          reply={generatedReply}
+          copied={copied}
+          onCopy={handleCopyReply}
+        />
+
         <TaskCard tasks={tasks} />
       </div>
     </section>

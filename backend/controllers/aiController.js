@@ -1,4 +1,9 @@
-const normalizeWhitespace = (value = "") => value.replace(/\s+/g, " ").trim();
+const {
+  summarizeEmail: generateAISummary,
+} = require("../services/aiService");
+
+const normalizeWhitespace = (value = "") =>
+  value.replace(/\s+/g, " ").trim();
 
 const getSentenceChunks = (value = "") => {
   return value
@@ -9,8 +14,13 @@ const getSentenceChunks = (value = "") => {
 
 const summarizeEmail = async (req, res) => {
   try {
-    const { body } = req.body || {};
-    const cleanBody = typeof body === "string" ? body.trim() : "";
+    const { subject = "", body } = req.body || {};
+
+    const cleanSubject =
+      typeof subject === "string" ? subject.trim() : "";
+
+    const cleanBody =
+      typeof body === "string" ? body.trim() : "";
 
     if (!cleanBody) {
       return res.status(400).json({
@@ -19,23 +29,25 @@ const summarizeEmail = async (req, res) => {
       });
     }
 
-    const cleanedText = normalizeWhitespace(cleanBody);
-    const sentences = getSentenceChunks(cleanedText);
-    const summarySource = sentences.slice(0, 2).join(" ");
-    const summary = normalizeWhitespace(
-      summarySource.length > 180
-        ? `${summarySource.slice(0, 177)}...`
-        : summarySource
-    );
+    const summary = await generateAISummary(cleanSubject, cleanBody);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      summary: summary || `Email about: ${cleanedText.slice(0, 120)}`,
+      summary,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Gemini summarization error:", error);
+
+    const statusCode =
+      Number.isInteger(error?.status) && error.status >= 400
+        ? error.status
+        : 500;
+
+    return res.status(statusCode).json({
       success: false,
-      message: "Failed to process email",
+      message:
+        error?.message ||
+        "Failed to generate email summary",
     });
   }
 };
@@ -43,7 +55,9 @@ const summarizeEmail = async (req, res) => {
 const generateReply = async (req, res) => {
   try {
     const { subject = "", sender = "", body } = req.body || {};
-    const cleanBody = typeof body === "string" ? body.trim() : "";
+
+    const cleanBody =
+      typeof body === "string" ? body.trim() : "";
 
     if (!cleanBody) {
       return res.status(400).json({
@@ -52,12 +66,15 @@ const generateReply = async (req, res) => {
       });
     }
 
-    const senderName = typeof sender === "string" && sender.trim()
-      ? sender.trim().split("@")[0]
-      : "there";
-    const subjectText = typeof subject === "string" && subject.trim()
-      ? ` regarding "${subject.trim()}"`
-      : "";
+    const senderName =
+      typeof sender === "string" && sender.trim()
+        ? sender.trim().split("@")[0]
+        : "there";
+
+    const subjectText =
+      typeof subject === "string" && subject.trim()
+        ? ` regarding "${subject.trim()}"`
+        : "";
 
     const reply = [
       `Hi ${senderName},`,
@@ -67,14 +84,18 @@ const generateReply = async (req, res) => {
       "Best regards",
     ].join("\n");
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       reply,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Reply generation error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to process email",
+      message:
+        error?.message ||
+        "Failed to generate reply",
     });
   }
 };
@@ -82,7 +103,9 @@ const generateReply = async (req, res) => {
 const extractTasks = async (req, res) => {
   try {
     const { body } = req.body || {};
-    const cleanBody = typeof body === "string" ? body.trim() : "";
+
+    const cleanBody =
+      typeof body === "string" ? body.trim() : "";
 
     if (!cleanBody) {
       return res.status(400).json({
@@ -112,20 +135,32 @@ const extractTasks = async (req, res) => {
       .filter(Boolean);
 
     const seenTasks = new Set();
+
     const tasks = taskSentences
       .filter((sentence) => {
         const lowerSentence = sentence.toLowerCase();
-        return actionWords.some((word) => new RegExp(`\\b${word}\\b`).test(lowerSentence));
+
+        return actionWords.some((word) =>
+          new RegExp(`\\b${word}\\b`).test(lowerSentence)
+        );
       })
       .map((sentence) => {
-        const normalized = normalizeWhitespace(sentence.replace(/[.!,;:]+$/g, ""));
-        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+        const normalized = normalizeWhitespace(
+          sentence.replace(/[.!,;:]+$/g, "")
+        );
+
+        return (
+          normalized.charAt(0).toUpperCase() +
+          normalized.slice(1)
+        );
       })
       .filter((taskTitle) => {
         const key = taskTitle.toLowerCase();
+
         if (seenTasks.has(key)) {
           return false;
         }
+
         seenTasks.add(key);
         return true;
       })
@@ -134,14 +169,18 @@ const extractTasks = async (req, res) => {
         completed: false,
       }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       tasks,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Task extraction error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to process email",
+      message:
+        error?.message ||
+        "Failed to extract tasks",
     });
   }
 };
