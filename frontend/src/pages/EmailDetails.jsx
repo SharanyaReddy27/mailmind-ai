@@ -6,6 +6,11 @@ import {
   generateReply,
   summarizeEmail,
 } from "../services/aiService";
+import ErrorMessage from "../components/ErrorMessage";
+import LoadingSpinner from "../components/LoadingSpinner";
+import ReplyCard from "../components/ReplyCard";
+import SummaryCard from "../components/SummaryCard";
+import TaskCard from "../components/TaskCard";
 
 function EmailDetails() {
   const { id } = useParams();
@@ -27,7 +32,7 @@ function EmailDetails() {
         setError("");
       })
       .catch(() => {
-        setError("Unable to load this email.");
+        setError("Unable to connect to backend.");
       })
       .finally(() => {
         setLoading(false);
@@ -42,7 +47,7 @@ function EmailDetails() {
     const body = email.body || email.content || email.message || "";
 
     if (!body.trim()) {
-      setError("This email does not have any body content to process.");
+      setError("Email body is empty. There is nothing to process.");
       return;
     }
 
@@ -53,25 +58,27 @@ function EmailDetails() {
     try {
       if (action === "summarize") {
         const result = await summarizeEmail(email);
-        setSummary(result);
+        setSummary(result || "No summary returned.");
         setGeneratedReply("");
         setTasks([]);
       } else if (action === "reply") {
         const result = await generateReply(email);
-        setGeneratedReply(result);
+        setGeneratedReply(result || "No reply returned.");
         setSummary("");
         setTasks([]);
       } else if (action === "tasks") {
         const result = await extractTasks(email);
-        setTasks(result);
+        setTasks(result || []);
         setSummary("");
         setGeneratedReply("");
       }
     } catch (requestError) {
       setError(
-        requestError.message ||
-          "Unable to process this email. Make sure the backend is running."
+        requestError.message || "AI request failed. Make sure the backend is running."
       );
+      setSummary("");
+      setGeneratedReply("");
+      setTasks([]);
     } finally {
       setActiveAction("");
     }
@@ -92,23 +99,51 @@ function EmailDetails() {
   };
 
   if (loading) {
-    return <p>Loading email...</p>;
+    return (
+      <div className="page-shell">
+        <LoadingSpinner label="Loading email..." />
+      </div>
+    );
   }
 
   if (error && !email) {
-    return <p>{error}</p>;
+    return (
+      <div className="page-shell">
+        <ErrorMessage title="Email unavailable" message={error} />
+      </div>
+    );
   }
 
   if (!email) {
-    return <p>Email not found.</p>;
+    return (
+      <div className="page-shell">
+        <ErrorMessage title="Email not found" message="The requested email could not be found." />
+      </div>
+    );
   }
 
   const priorityClass = (email.priority || "medium").toLowerCase();
   const body = email.body || email.content || email.message || "";
+  const receivedAt = email.receivedAt || email.date || email.createdAt || "";
+  const formatDate = (value) => {
+    if (!value) {
+      return "No date";
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+      return value;
+    }
+
+    return dateValue.toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
 
   return (
     <section className="email-details">
-      <Link to="/inbox">← Back to Inbox</Link>
+      <Link to="/inbox" className="back-link">← Back to Inbox</Link>
 
       <div className="email-details-header">
         <div>
@@ -116,18 +151,21 @@ function EmailDetails() {
           <p>
             From: {email.senderName || email.sender || email.senderEmail || "Unknown sender"}
           </p>
+          <p>To: {email.recipient || email.to || "Unknown recipient"}</p>
+          <p className="detail-meta">{formatDate(receivedAt)}</p>
         </div>
 
         {email.priority && (
-          <span className={`priority ${priorityClass}`}>
-            {email.priority}
-          </span>
+          <span className={`priority ${priorityClass}`}>{email.priority}</span>
         )}
       </div>
 
       <hr />
 
-      <p className="email-body">{body}</p>
+      <div className="email-body-card">
+        <h3>Email Body</h3>
+        <p className="email-body">{body}</p>
+      </div>
 
       <div className="email-actions">
         <button
@@ -155,43 +193,13 @@ function EmailDetails() {
         </button>
       </div>
 
-      {error && <p className="result-box">{error}</p>}
+      {error && <ErrorMessage title="AI request failed" message={error} />}
 
-      {summary && (
-        <div className="result-box">
-          <h4>AI Summary</h4>
-          <p>{summary}</p>
-        </div>
-      )}
-
-      {generatedReply && (
-        <div className="result-box">
-          <h4>Suggested Reply</h4>
-          <pre>{generatedReply}</pre>
-          <button type="button" className="copy-button" onClick={handleCopyReply}>
-            {copied ? "Copied!" : "Copy Reply"}
-          </button>
-        </div>
-      )}
-
-      {tasks.length > 0 && (
-        <div className="result-box">
-          <h4>Extracted Tasks</h4>
-          <ul>
-            {tasks.map((task, index) => (
-              <li key={`${task.title || "task"}-${index}`}>
-                {task.title || task}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!summary && !generatedReply && tasks.length === 0 && !error && (
-        <div className="result-box">
-          <p>Choose an action to analyze this email.</p>
-        </div>
-      )}
+      <div className="results-stack">
+        <SummaryCard title="AI Summary" content={summary} />
+        <ReplyCard reply={generatedReply} copied={copied} onCopy={handleCopyReply} />
+        <TaskCard tasks={tasks} />
+      </div>
     </section>
   );
 }
