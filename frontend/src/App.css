@@ -469,3 +469,240 @@ nav {
 main {
   padding: 20px 24px 36px;
 }
+body {
+  background-color: #f8fafc;
+  color: #111827;
+}
+
+.app {
+  color: #111827;
+}
+
+.auth-card h1,
+.page-header h1,
+.email-card h2,
+.email-details h1,
+nav h2 {
+  color: #111827;
+}
+
+.field-input {
+  background-color: #ffffff;
+  color: #111827;
+}
+
+.field-input::placeholder {
+  color: #9ca3af;
+}
+.settings-page {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.settings-header {
+  margin-bottom: 28px;
+}
+
+.settings-header h1 {
+  margin: 0 0 8px;
+  font-size: 2.4rem;
+  color: #111827;
+}
+
+.settings-header p {
+  color: #6b7280;
+}
+
+.integration-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.integration-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.integration-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #f3f4f6;
+  font-size: 24px;
+}
+
+.integration-card h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.integration-description {
+  color: #6b7280;
+  margin-bottom: 14px;
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.connection-status.connected {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-button.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.settings-button.secondary {
+  background: #111827;
+  color: white;
+}
+
+.settings-button.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.settings-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.settings-error {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+/* ================= SETTINGS PAGE ================= */
+
+.integration-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  margin-top: 20px;
+}
+
+.integration-card-left {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.integration-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  background: #eef2ff;
+  border-radius: 14px;
+}
+
+.integration-card-left h3 {
+  margin: 0;
+  color: #111827;
+}
+
+.integration-card-left p {
+  margin-top: 6px;
+  color: #6b7280;
+}
+
+.integration-card-right {
+  min-width: 320px;
+  text-align: left;
+}
+
+.integration-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.integration-actions button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.integration-actions .primary {
+  background: #2563eb;
+  color: white;
+}
+
+.integration-actions .danger {
+  background: #dc2626;
+  color: white;
+}
+
+.integration-actions button:hover {
+  opacity: 0.9;
+}
+
+.sync-result {
+  margin-top: 18px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.sync-result p {
+  margin: 4px 0;
+}
+
+@media (max-width: 768px) {
+  .integration-card {
+    flex-direction: column;
+  }
+
+  .integration-card-right {
+    width: 100%;
+  }
+}

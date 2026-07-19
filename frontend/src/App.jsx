@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Link,
@@ -14,7 +15,7 @@ import Inbox from "./pages/Inbox";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import "./App.css";
-
+import Settings from "./pages/Settings";
 function AppShell() {
   const { currentUser, logout } = useAuth();
 
@@ -46,15 +47,81 @@ function AppShell() {
       </nav>
 
       <main>
-        <Routes>
-          <Route path="/" element={<Navigate to={currentUser ? "/dashboard" : "/login"} replace />} />
-          <Route path="/login" element={currentUser ? <Navigate to="/dashboard" replace /> : <Login />} />
-          <Route path="/register" element={currentUser ? <Navigate to="/dashboard" replace /> : <Register />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
-          <Route path="/emails/:id" element={<ProtectedRoute><EmailDetails /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to={currentUser ? "/dashboard" : "/login"} replace />} />
-        </Routes>
+      <Routes>
+  <Route
+    path="/"
+    element={
+      <Navigate
+        to={currentUser ? "/dashboard" : "/login"}
+        replace
+      />
+    }
+  />
+
+  <Route
+    path="/login"
+    element={
+      currentUser
+        ? <Navigate to="/dashboard" replace />
+        : <Login />
+    }
+  />
+
+  <Route
+    path="/register"
+    element={
+      currentUser
+        ? <Navigate to="/dashboard" replace />
+        : <Register />
+    }
+  />
+
+  <Route
+    path="/dashboard"
+    element={
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/settings"
+    element={
+      <ProtectedRoute>
+        <Settings />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/inbox"
+    element={
+      <ProtectedRoute>
+        <Inbox />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="/emails/:id"
+    element={
+      <ProtectedRoute>
+        <EmailDetails />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="*"
+    element={
+      <Navigate
+        to={currentUser ? "/dashboard" : "/login"}
+        replace
+      />
+    }
+  />
+</Routes>
       </main>
     </div>
   );

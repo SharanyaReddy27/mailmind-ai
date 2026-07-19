@@ -3,6 +3,25 @@ const GmailConnection = require('../models/GmailConnection');
 const Email = require('../models/Email');
 const { createOAuthClient } = require('../config/googleOAuth');
 
+const connectGmail = async (req, res) => {
+  try {
+    const oauth2Client = createOAuthClient();
+
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: [
+        'https://www.googleapis.com/auth/gmail.modify'
+      ]
+    });
+
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Gmail connect error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 function decodeBase64Url(str) {
   if (!str) return '';
   // base64url to base64
