@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import api from "../services/api";
+import { getEmailById, getErrorMessage } from "../services/api";
 
 function EmailDetails() {
   const { id } = useParams();
@@ -10,14 +10,13 @@ function EmailDetails() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .get(`/emails/${id}`)
+    getEmailById(id)
       .then((response) => {
         setEmail(response.data);
         setError("");
       })
-      .catch(() => {
-        setError("Unable to load this email.");
+      .catch((err) => {
+        setError(getErrorMessage(err));
       })
       .finally(() => {
         setLoading(false);

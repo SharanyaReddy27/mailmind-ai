@@ -1,59 +1,84 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  generateReply,
+  getErrorMessage,
+  extractTasks,
+  summarizeEmail,
+} from "../services/api";
 
 function EmailCard({ email }) {
   const [summary, setSummary] = useState("");
   const [reply, setReply] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [actionError, setActionError] = useState("");
+  const [loadingAction, setLoadingAction] = useState("");
 
-  const handleSummarize = (event) => {
+  const handleSummarize = async (event) => {
     event.preventDefault();
+    setActionError("");
+    setLoadingAction("summarize");
 
-    setSummary(
-      `${email.subject}: ${
-        email.body ||
-        email.message ||
-        email.snippet ||
-        "No email content available."
-      }`
-    );
+    try {
+      const response = await summarizeEmail({
+        subject: email.subject || "",
+        sender: email.senderEmail || email.sender || "",
+        body: email.body || email.message || email.snippet || "",
+      });
+
+      setSummary(response.data.summary || "");
+    } catch (error) {
+      setSummary("");
+      setActionError(getErrorMessage(error));
+    } finally {
+      setLoadingAction("");
+    }
   };
 
-  const handleGenerateReply = (event) => {
+  const handleGenerateReply = async (event) => {
     event.preventDefault();
+    setActionError("");
+    setLoadingAction("reply");
 
-    setReply(
-      `Hello ${
-        email.senderName || email.sender || "there"
-      },\n\nThank you for your email regarding "${
-        email.subject
-      }". I will review it and get back to you soon.\n\nRegards`
-    );
+    try {
+      const response = await generateReply({
+        subject: email.subject || "",
+        sender: email.senderEmail || email.sender || "",
+        body: email.body || email.message || email.snippet || "",
+      });
+
+      setReply(response.data.reply || "");
+    } catch (error) {
+      setReply("");
+      setActionError(getErrorMessage(error));
+    } finally {
+      setLoadingAction("");
+    }
   };
 
-  const handleExtractTasks = (event) => {
+  const handleExtractTasks = async (event) => {
     event.preventDefault();
+    setActionError("");
+    setLoadingAction("tasks");
 
-    const text =
-      email.body || email.message || email.snippet || "";
+    try {
+      const response = await extractTasks({
+        subject: email.subject || "",
+        sender: email.senderEmail || email.sender || "",
+        body: email.body || email.message || email.snippet || "",
+      });
 
-    const extractedTasks = text
-      .split(".")
-      .map((sentence) => sentence.trim())
-      .filter(
-        (sentence) =>
-          sentence.toLowerCase().includes("please") ||
-          sentence.toLowerCase().includes("schedule") ||
-          sentence.toLowerCase().includes("complete") ||
-          sentence.toLowerCase().includes("submit") ||
-          sentence.toLowerCase().includes("apply")
+      const extractedTasks = (response.data.tasks || []).map((task) =>
+        typeof task === "string" ? task : task.title || "Untitled task"
       );
 
-    setTasks(
-      extractedTasks.length > 0
-        ? extractedTasks
-        : ["No specific tasks found."]
-    );
+      setTasks(extractedTasks.length > 0 ? extractedTasks : ["No specific tasks found."]);
+    } catch (error) {
+      setTasks([]);
+      setActionError(getErrorMessage(error));
+    } finally {
+      setLoadingAction("");
+    }
   };
 
   return (
@@ -106,6 +131,9 @@ function EmailCard({ email }) {
           Extract Tasks
         </button>
       </div>
+
+      {loadingAction && <p>Processing request...</p>}
+      {actionError && <p>{actionError}</p>}
 
       {summary && (
         <div className="result-box">
