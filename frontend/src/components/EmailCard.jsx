@@ -45,7 +45,7 @@ function EmailCard({ email }) {
         <div className="email-meta">
           <span>{formatDate(receivedAt)}</span>
           <span className={`status-pill ${readStatus.toLowerCase()}`}>{readStatus}</span>
-          {email.source === 'gmail' && <span className="gmail-pill">Gmail</span>}
+          {email.source === "gmail" && <span className="gmail-pill">Gmail</span>}
         </div>
       </Link>
     </article>

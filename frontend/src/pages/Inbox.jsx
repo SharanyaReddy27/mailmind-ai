@@ -28,9 +28,9 @@ function Inbox() {
   useEffect(() => {
     loadEmails();
     const onSync = () => loadEmails();
-    window.addEventListener('mailmind:sync', onSync);
+    window.addEventListener("mailmind:sync", onSync);
 
-    return () => window.removeEventListener('mailmind:sync', onSync);
+    return () => window.removeEventListener("mailmind:sync", onSync);
   }, []);
 
   if (loading) {
