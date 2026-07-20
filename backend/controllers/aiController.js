@@ -1,5 +1,6 @@
 const {
   summarizeEmail: generateAISummary,
+  generateEmailReply,
 } = require("../services/aiService");
 
 const normalizeWhitespace = (value = "") =>
@@ -54,48 +55,50 @@ const summarizeEmail = async (req, res) => {
 
 const generateReply = async (req, res) => {
   try {
-    const { subject = "", sender = "", body } = req.body || {};
+    const {
+      subject = "",
+      body,
+      senderName = "",
+      tone = "professional",
+    } = req.body;
 
-    const cleanBody =
-      typeof body === "string" ? body.trim() : "";
-
-    if (!cleanBody) {
+    if (typeof body !== "string" || !body.trim()) {
       return res.status(400).json({
         success: false,
         message: "Email body is required",
       });
     }
 
-    const senderName =
-      typeof sender === "string" && sender.trim()
-        ? sender.trim().split("@")[0]
-        : "there";
-
-    const subjectText =
-      typeof subject === "string" && subject.trim()
-        ? ` regarding "${subject.trim()}"`
-        : "";
-
-    const reply = [
-      `Hi ${senderName},`,
-      "",
-      `Thank you for your message${subjectText}. I appreciate the update and will review the details carefully.`,
-      "",
-      "Best regards",
-    ].join("\n");
+    const reply = await generateEmailReply({
+      subject,
+      body,
+      senderName,
+      tone,
+    });
 
     return res.status(200).json({
       success: true,
       reply,
     });
   } catch (error) {
-    console.error("Reply generation error:", error);
+    console.error(
+      "AI reply generation error:",
+      error?.message
+    );
 
-    return res.status(500).json({
+    const statusCode = error?.status || 500;
+
+    let message =
+      error?.message || "Failed to generate email reply";
+
+    if (statusCode >= 500 && statusCode !== 503) {
+      message =
+        "Something went wrong while generating the reply. Please try again.";
+    }
+
+    return res.status(statusCode).json({
       success: false,
-      message:
-        error?.message ||
-        "Failed to generate reply",
+      message,
     });
   }
 };

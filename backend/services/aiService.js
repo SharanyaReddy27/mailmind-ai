@@ -49,6 +49,67 @@ Rules:
 - Do not invent information.
 `;
 };
+const ALLOWED_REPLY_TONES = [
+  "professional",
+  "friendly",
+  "concise",
+];
+
+const buildReplyPrompt = ({
+  subject,
+  body,
+  senderName,
+  tone,
+}) => {
+  const cleanSubject =
+    typeof subject === "string" && subject.trim()
+      ? subject.trim()
+      : "No subject";
+
+  const cleanBody =
+    typeof body === "string" ? body.trim() : "";
+
+  const cleanSenderName =
+    typeof senderName === "string" && senderName.trim()
+      ? senderName.trim()
+      : "Sender";
+
+  const selectedTone = ALLOWED_REPLY_TONES.includes(tone)
+    ? tone
+    : "professional";
+
+  const toneInstructions = {
+    professional:
+      "Use a professional, courteous and business-appropriate tone.",
+    friendly:
+      "Use a warm, friendly and approachable tone while remaining respectful.",
+    concise:
+      "Keep the reply brief, direct and complete.",
+  };
+
+  return `Draft a natural email reply to the email below.
+
+Original email subject:
+${cleanSubject}
+
+Sender:
+${cleanSenderName}
+
+Original email:
+${cleanBody}
+
+Instructions:
+- ${toneInstructions[selectedTone]}
+- Respond directly to the actual email.
+- Preserve important details accurately.
+- Do not invent names, dates, times, promises or facts.
+- If the sender asks for confirmation, provide a suitable confirmation without inventing unavailable information.
+- Do not include a subject line.
+- Do not include headings such as "Generated Reply" or "Reply".
+- Do not use markdown, bullet points or code blocks.
+- Do not add the recipient's name unless it is provided.
+- Return only the email reply body.`;
+};
 /**
  * Checks whether Gemini returned a temporary server error.
  */
@@ -136,8 +197,120 @@ const summarizeEmail = async (subject, body) => {
   error.status = 503;
   throw error;
 };
+const generateEmailReply = async ({
+  subject,
+  body,
+  senderName,
+  tone = "professional",
+}) => {
+  if (typeof body !== "string" || !body.trim()) {
+    const error = new Error("Email body is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const normalizedTone =
+    typeof tone === "string"
+      ? tone.trim().toLowerCase()
+      : "professional";
+
+  if (!ALLOWED_REPLY_TONES.includes(normalizedTone)) {
+    const error = new Error(
+      "Tone must be professional, friendly or concise"
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  const model = getAIModel();
+
+  const prompt = buildReplyPrompt({
+    subject,
+    body,
+    senderName,
+    tone: normalizedTone,
+  });
+
+  const maximumAttempts = 2;
+
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    try {
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 700,
+        },
+      });
+
+      const response = await result.response;
+      let reply = response.text()?.trim();
+
+      if (!reply) {
+        const error = new Error(
+          "AI returned an empty reply. Please try again."
+        );
+
+        error.status = 502;
+        throw error;
+      }
+
+      reply = reply
+        .replace(/^(generated reply|email reply|reply)\s*:\s*/i, "")
+        .replace(/^```(?:text)?/i, "")
+        .replace(/```$/i, "")
+        .trim();
+
+      if (reply.length < 10) {
+        const error = new Error(
+          "AI returned an incomplete reply. Please try again."
+        );
+
+        error.status = 502;
+        throw error;
+      }
+
+      return reply;
+    } catch (error) {
+      const temporaryError = isTemporaryGeminiError(error);
+
+      if (!temporaryError) {
+        throw error;
+      }
+
+      if (attempt === maximumAttempts) {
+        const busyError = new Error(
+          "AI service is currently busy. Please try again shortly."
+        );
+
+        busyError.status = 503;
+        throw busyError;
+      }
+
+      console.warn(
+        "Gemini reply generation is temporarily unavailable. Retrying..."
+      );
+
+      await wait(1000);
+    }
+  }
+
+  const error = new Error(
+    "Failed to generate email reply"
+  );
+
+  error.status = 502;
+  throw error;
+};
 
 module.exports = {
   summarizeEmail,
+  generateEmailReply,
   buildSummaryPrompt,
+  buildReplyPrompt,
 };

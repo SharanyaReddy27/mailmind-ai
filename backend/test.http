@@ -1,0 +1,10 @@
+POST http://localhost:5000/api/ai/reply
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTVjZWZlN2E0NzhjN2E5MGU2OTVhZjEiLCJlbWFpbCI6InNvZnQuc2tpbnN0b3JpZXMwMkBnbWFpbC5jb20iLCJpYXQiOjE3ODQ1MzU4ODEsImV4cCI6MTc4NTE0MDY4MX0.4T0kUg-cIjXUq8iW8J8oOZaGDbgYSuzhHoxu9igAplQ
+
+{
+  "subject": "Interview confirmation",
+  "body": "Your interview is scheduled for Monday at 10 AM. Please confirm your availability.",
+  "senderName": "Recruitment Team",
+  "tone": "professional"
+}
