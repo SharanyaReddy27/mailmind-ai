@@ -79,13 +79,15 @@ function EmailDetails() {
         setGeneratedReply("");
       }
   } catch (requestError) {
-  if (action === "reply") {
-    setGeneratedReply("");
+ if (action === "reply") {
+  setSummary("");
+  setTasks([]);
+  setGeneratedReply("");
 
-    setError(
-      "We couldn't generate a reply right now. Please try again."
-    );
-  } else {
+  setError(
+    "We couldn't generate a reply right now. Please try again."
+  );
+} else {
     setError(
       requestError.message ||
         "AI request failed. Make sure the backend is running."
@@ -215,8 +217,8 @@ const handleClearReply = () => {
           disabled={activeAction === "summarize"}
         >
           {activeAction === "summarize"
-            ? " Summarizing..."
-            : " Summarize"}
+            ? "Summarizing..."
+            : "Summarize"}
         </button>
 
         <div className="reply-control-group">
