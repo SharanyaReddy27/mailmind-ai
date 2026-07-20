@@ -42,8 +42,14 @@ export const summarizeEmail = async (email) => {
   return data.summary;
 };
 
-export const generateReply = async (email) => {
-  const payload = buildPayload(email);
+export const generateReply = async (email, tone = "professional") => {
+  const payload = {
+    subject: email?.subject || "",
+    senderName: email?.senderName || email?.sender || email?.senderEmail || "",
+    body: email?.body || email?.content || email?.message || "",
+    tone,
+  };
+
   const data = await requestJson("/api/ai/reply", payload);
   return data.reply;
 };
