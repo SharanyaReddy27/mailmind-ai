@@ -6,7 +6,7 @@ const { getAIModel } = require("../config/ai");
 
 const SUMMARY_GENERATION_CONFIG = {
   temperature: 0.1,
-  maxOutputTokens: 500,
+  maxOutputTokens: 700,
 };
 
 const wait = (milliseconds) =>
@@ -19,41 +19,36 @@ const buildSummaryPrompt = (subject, body) => {
   const cleanSubject =
     typeof subject === "string" && subject.trim()
       ? subject.trim()
-      : "(no subject)";
+      : "No subject";
 
   const cleanBody =
-    typeof body === "string"
+    typeof body === "string" && body.trim()
       ? body.trim()
-      : "";
+      : "No email content provided";
 
-  return `You are an accurate email summarization assistant.
+  return `
+Summarize the following email for the recipient.
 
-Read the email carefully and summarize only the information actually present.
-
-Email subject:
+SUBJECT:
 ${cleanSubject}
 
-Email body:
+EMAIL CONTENT:
 ${cleanBody}
 
-Instructions:
-- Preserve the exact meaning of the email.
-- Do not add assumptions or invented information.
-- Mention the main purpose of the email.
-- Mention all important actions the recipient must take.
-- Mention dates, deadlines, meeting times and locations exactly when present.
-- Mention important names, organizations and links when present.
-- Mention warnings, account alerts or security information when present.
-- Ignore unnecessary greetings, signatures, advertisements and repeated text.
-- Use 2 to 5 bullet points when the email contains enough information.
-- For a very short email, use 1 clear bullet point.
-- Each bullet should be a complete and understandable sentence.
-- Do not make the summary so short that important details are lost.
-- Do not include headings, introductions or closing remarks.
-- Each bullet must begin with "•".
-- Return only the bullet points.`;
-};
+Return only 2 to 5 useful bullet points.
 
+Rules:
+- Start each point with •
+- State the actual purpose of the email.
+- Include every important action the recipient must complete.
+- Include relevant names, dates, deadlines and links.
+- Ignore greetings, signatures, tracking links and legal footer text.
+- Do not write a heading.
+- Do not write "Analyze the Email".
+- Do not write "Bullet 1", "Purpose" or repeat these instructions.
+- Do not invent information.
+`;
+};
 /**
  * Checks whether Gemini returned a temporary server error.
  */
@@ -90,18 +85,22 @@ const summarizeEmail = async (subject, body) => {
         ],
         generationConfig: SUMMARY_GENERATION_CONFIG,
       });
-
       const response = await result.response;
-      const text = response.text();
+      const text = response.text()?.trim();
 
-      if (!text || !text.trim()) {
+      const finishReason = response?.candidates?.[0]?.finishReason;
+
+      console.log("Gemini finish reason:", finishReason);
+      console.log("Generated summary:", text);
+
+      if (!text || text.length < 20) {
         const error = new Error(
-          "AI returned an empty summary. Please try again."
-        );
+        "Gemini returned an incomplete summary. Please try again."
+      );
 
-        error.status = 502;
-        throw error;
-      }
+      error.status = 502;
+      throw error;
+    }
 
       return text.trim();
     } catch (error) {
