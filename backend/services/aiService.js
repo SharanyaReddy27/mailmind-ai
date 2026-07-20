@@ -161,14 +161,26 @@ Instructions:
  * Checks whether Gemini returned a temporary server error.
  */
 const isTemporaryGeminiError = (error) => {
+  const status =
+    error?.status ||
+    error?.response?.status ||
+    error?.statusCode;
+
+  if ([429, 500, 502, 503, 504].includes(status)) {
+    return true;
+  }
+
   const message = String(error?.message || "").toLowerCase();
 
   return (
+    message.includes("429") ||
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
     message.includes("503") ||
-    message.includes("service unavailable") ||
-    message.includes("high demand") ||
-    message.includes("temporarily unavailable") ||
-    message.includes("overloaded")
+    message.includes("500") ||
+    message.includes("overloaded") ||
+    message.includes("unavailable")
   );
 };
 
@@ -232,7 +244,7 @@ const summarizeEmail = async (subject, body) => {
       console.warn(
         `Gemini is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
       );
-
+      throw createAIServiceError(error);
       await wait(delay);
     }
   }
@@ -243,6 +255,41 @@ const summarizeEmail = async (subject, body) => {
 
   error.status = 503;
   throw error;
+};
+const normalizePriority = (priority) => {
+  if (typeof priority !== "string") {
+    return "Medium";
+  }
+
+  const normalized = priority.trim().toLowerCase();
+
+  if (normalized === "high") return "High";
+  if (normalized === "low") return "Low";
+
+  return "Medium";
+};
+const createAIServiceError = (error) => {
+  const status = error?.status || error?.response?.status;
+
+  if (status === 429) {
+    const quotaError = new Error(
+      "AI request limit reached. Please try again after some time."
+    );
+    quotaError.statusCode = 429;
+    return quotaError;
+  }
+
+  if ([500, 502, 503, 504].includes(status)) {
+    const temporaryError = new Error(
+      "AI service is temporarily unavailable. Please try again."
+    );
+    temporaryError.statusCode = 503;
+    return temporaryError;
+  }
+
+  const genericError = new Error("AI service request failed");
+  genericError.statusCode = 500;
+  return genericError;
 };
 const generateEmailReply = async ({
   subject,
@@ -345,6 +392,7 @@ const generateEmailReply = async ({
 
       await wait(1000);
     }
+    throw createAIServiceError(error);
   }
 
   const error = new Error(
@@ -423,7 +471,7 @@ const extractEmailTasks = async (body) => {
         ? task.priority
         : "Medium",
     }));
-
+    throw createAIServiceError(error);
   return tasks;
 };
 
