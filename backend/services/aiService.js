@@ -54,7 +54,54 @@ const ALLOWED_REPLY_TONES = [
   "friendly",
   "concise",
 ];
+const buildTaskPrompt = (body) => {
+  return `
+You are an AI email task extraction assistant.
 
+Read the email below and extract only clear, actionable tasks.
+
+For each task, return:
+- title: a short action statement
+- deadline: the date or time mentioned in the email, or null
+- priority: High, Medium, or Low
+
+Priority rules:
+- High: urgent, immediate, today, tomorrow, important, or strict deadline
+- Medium: task has a future deadline but is not urgent
+- Low: optional or no deadline
+
+Return ONLY valid JSON in this exact structure:
+
+{
+  "tasks": [
+    {
+      "title": "Submit internship report",
+      "deadline": "Friday",
+      "priority": "High"
+    }
+  ]
+}
+
+If there are no actionable tasks, return:
+
+{
+  "tasks": []
+}
+
+Do not add markdown.
+Do not use code fences.
+Do not add explanations.
+
+Email:
+${body}
+`;
+};
+const cleanJsonResponse = (text) => {
+  return text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+};
 const buildReplyPrompt = ({
   subject,
   body,
@@ -307,10 +354,84 @@ const generateEmailReply = async ({
   error.status = 502;
   throw error;
 };
+const extractEmailTasks = async (body) => {
+  if (!body || !body.trim()) {
+    const error = new Error("Email body is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const model = getAIModel();
+
+  const result = await model.generateContent({
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: buildTaskPrompt(body),
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 1000,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const response = result.response;
+  const rawText = response.text();
+
+  console.log(
+    "Gemini task extraction finish reason:",
+    response.candidates?.[0]?.finishReason
+  );
+
+  const cleanedText = cleanJsonResponse(rawText);
+
+  let parsedResult;
+
+  try {
+    parsedResult = JSON.parse(cleanedText);
+  } catch (error) {
+    console.error("Invalid task JSON returned by Gemini:", rawText);
+
+    const parseError = new Error(
+      "AI returned an invalid task extraction response"
+    );
+    parseError.statusCode = 502;
+    throw parseError;
+  }
+
+  if (!Array.isArray(parsedResult.tasks)) {
+    const formatError = new Error("AI response does not contain a tasks array");
+    formatError.statusCode = 502;
+    throw formatError;
+  }
+
+  const tasks = parsedResult.tasks
+    .filter((task) => task && typeof task.title === "string")
+    .map((task) => ({
+      title: task.title.trim(),
+      deadline:
+        typeof task.deadline === "string" && task.deadline.trim()
+          ? task.deadline.trim()
+          : null,
+      priority: ["High", "Medium", "Low"].includes(task.priority)
+        ? task.priority
+        : "Medium",
+    }));
+
+  return tasks;
+};
 
 module.exports = {
   summarizeEmail,
   generateEmailReply,
+  extractEmailTasks,
   buildSummaryPrompt,
   buildReplyPrompt,
+  buildTaskPrompt,
 };

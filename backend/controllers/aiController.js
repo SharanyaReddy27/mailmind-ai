@@ -1,6 +1,7 @@
 const {
   summarizeEmail: generateAISummary,
   generateEmailReply,
+  extractEmailTasks,
 } = require("../services/aiService");
 
 const normalizeWhitespace = (value = "") =>
@@ -105,85 +106,32 @@ const generateReply = async (req, res) => {
 
 const extractTasks = async (req, res) => {
   try {
-    const { body } = req.body || {};
+    const { body } = req.body;
 
-    const cleanBody =
-      typeof body === "string" ? body.trim() : "";
-
-    if (!cleanBody) {
+    if (!body || !body.trim()) {
       return res.status(400).json({
         success: false,
         message: "Email body is required",
       });
     }
 
-    const actionWords = [
-      "submit",
-      "complete",
-      "send",
-      "attend",
-      "review",
-      "prepare",
-      "update",
-      "call",
-      "schedule",
-      "share",
-      "finish",
-      "reply",
-    ];
-
-    const taskSentences = getSentenceChunks(cleanBody)
-      .flatMap((sentence) => sentence.split(/\s*\n\s*/))
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-
-    const seenTasks = new Set();
-
-    const tasks = taskSentences
-      .filter((sentence) => {
-        const lowerSentence = sentence.toLowerCase();
-
-        return actionWords.some((word) =>
-          new RegExp(`\\b${word}\\b`).test(lowerSentence)
-        );
-      })
-      .map((sentence) => {
-        const normalized = normalizeWhitespace(
-          sentence.replace(/[.!,;:]+$/g, "")
-        );
-
-        return (
-          normalized.charAt(0).toUpperCase() +
-          normalized.slice(1)
-        );
-      })
-      .filter((taskTitle) => {
-        const key = taskTitle.toLowerCase();
-
-        if (seenTasks.has(key)) {
-          return false;
-        }
-
-        seenTasks.add(key);
-        return true;
-      })
-      .map((title) => ({
-        title,
-        completed: false,
-      }));
+    const tasks = await extractEmailTasks(body);
 
     return res.status(200).json({
       success: true,
       tasks,
     });
   } catch (error) {
-    console.error("Task extraction error:", error);
+    console.error("Task extraction controller error:", error);
 
-    return res.status(500).json({
+    const statusCode = error.statusCode || 500;
+
+    return res.status(statusCode).json({
       success: false,
       message:
-        error?.message ||
-        "Failed to extract tasks",
+        statusCode === 500
+          ? "Failed to extract tasks from email"
+          : error.message,
     });
   }
 };
