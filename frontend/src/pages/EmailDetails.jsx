@@ -11,6 +11,11 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import ReplyCard from "../components/ReplyCard";
 import SummaryCard from "../components/SummaryCard";
 import TaskCard from "../components/TaskCard";
+const TONE_OPTIONS = [
+  { value: "professional", label: "Professional" },
+  { value: "friendly", label: "Friendly" },
+  { value: "concise", label: "Concise" },
+];
 
 function EmailDetails() {
   const { id } = useParams();
@@ -20,9 +25,11 @@ function EmailDetails() {
   const [error, setError] = useState("");
   const [summary, setSummary] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
-  const [tasks, setTasks] = useState([]);
+  const [tone, setTone] = useState("professional");
+  const [tasks, setTasks] = useState(null);
   const [activeAction, setActiveAction] = useState("");
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
 
   useEffect(() => {
     api
@@ -60,31 +67,56 @@ function EmailDetails() {
         const result = await summarizeEmail(email);
         setSummary(result || "No summary returned.");
         setGeneratedReply("");
-        setTasks([]);
+        setTasks(null);
       } else if (action === "reply") {
-        const result = await generateReply(email);
+        const result = await generateReply(email, tone);
         setGeneratedReply(result || "No reply returned.");
         setSummary("");
-        setTasks([]);
+        setTasks(null);
       } else if (action === "tasks") {
         const result = await extractTasks(email);
         setTasks(result || []);
         setSummary("");
         setGeneratedReply("");
       }
-    } catch (requestError) {
-      setError(
-        requestError.message ||
-          "AI request failed. Make sure the backend is running."
-      );
-      setSummary("");
-      setGeneratedReply("");
-      setTasks([]);
-    } finally {
+  } catch (requestError) {
+ if (action === "reply") {
+  setSummary("");
+  setTasks(null);
+  setGeneratedReply("");
+
+  setError(
+    "We couldn't generate a reply right now. Please try again."
+  );
+}
+else if (action === "tasks") {
+    setError("Couldn't extract tasks. Please try again.");
+}
+ else {
+    setError(
+      requestError.message ||
+        "AI request failed. Make sure the backend is running."
+    );
+
+    setSummary("");
+    setGeneratedReply("");
+    setTasks([]);
+  }
+  
+} finally {
       setActiveAction("");
     }
   };
+const handleChangeReply = (value) => {
+  setGeneratedReply(value);
+  setCopied(false);
+};
 
+const handleClearReply = () => {
+  setGeneratedReply("");
+  setCopied(false);
+  setError("");
+};
   const handleCopyReply = async () => {
     if (!generatedReply) {
       return;
@@ -187,28 +219,67 @@ function EmailDetails() {
       <div className="email-actions">
         <button
           type="button"
-          onClick={() => handleAction("summarize")}
+          onClick={() => {
+  setActiveTab("summary");
+  handleAction("summarize");
+}}
+         
           disabled={activeAction === "summarize"}
         >
           {activeAction === "summarize"
-            ? "📝 Summarizing..."
-            : "📝 Summarize"}
+            ? "Summarizing..."
+            : "Summarize"}
         </button>
+
+        <div className="reply-control-group">
+
+  <div
+    className="tone-selector"
+    role="group"
+    aria-label="Reply tone"
+  >
+    {TONE_OPTIONS.map((option) => (
+      <button
+        key={option.value}
+        type="button"
+        className={`tone-option ${
+          tone === option.value ? "active" : ""
+        }`}
+        onClick={() => setTone(option.value)}
+        aria-pressed={tone === option.value}
+        disabled={activeAction === "reply"}
+      >
+        {option.label}
+      </button>
+    ))}
+  </div>
+
+  <button
+    type="button"
+   onClick={() => {
+  setActiveTab("reply");
+  handleAction("reply");
+}}
+    disabled={activeAction === "reply"}
+  >
+    {activeAction === "reply"
+      ? "Generating reply..."
+      : "Generate Reply"}
+  </button>
+
+</div>
 
         <button
           type="button"
-          onClick={() => handleAction("reply")}
-          disabled={activeAction === "reply"}
-        >
-          {activeAction === "reply" ? "Generating..." : "Generate Reply"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleAction("tasks")}
+        onClick={() => {
+  setActiveTab("tasks");
+  handleAction("tasks");
+}}
           disabled={activeAction === "tasks"}
         >
-          {activeAction === "tasks" ? "Extracting..." : "Extract Tasks"}
+          {activeAction === "tasks"
+    ? "Extracting tasks..."
+    : "Extract Tasks"}
         </button>
       </div>
 
@@ -216,17 +287,62 @@ function EmailDetails() {
         <ErrorMessage title="AI request failed" message={error} />
       )}
 
-      <div className="results-stack">
-        <SummaryCard title="AI Summary" content={summary} />
+      <div className="ai-workspace">
 
-        <ReplyCard
-          reply={generatedReply}
-          copied={copied}
-          onCopy={handleCopyReply}
-        />
+  <div className="ai-tabs">
+    <button
+  className={activeTab === "summary" ? "tab active" : "tab"}
+  disabled={activeAction !== ""}
+      onClick={() => setActiveTab("summary")}
+    >
+      Summary
+    </button>
 
-        <TaskCard tasks={tasks} />
-      </div>
+    <button
+      className={activeTab === "reply" ? "tab active" : "tab"}
+      disabled={activeAction !== ""}
+      onClick={() => setActiveTab("reply")}
+    >
+      Reply
+    </button>
+
+    <button
+      className={activeTab === "tasks" ? "tab active" : "tab"}
+      onClick={() => setActiveTab("tasks")}
+      disabled={activeAction !== ""}
+    >
+      Tasks
+    </button>
+  </div>
+
+  <div className="tab-content">
+
+    {activeTab === "summary" && (
+      <SummaryCard
+        title="AI Summary"
+        content={summary}
+      />
+    )}
+
+    {activeTab === "reply" && (
+      <ReplyCard
+        reply={generatedReply}
+        onChangeReply={handleChangeReply}
+        onCopy={handleCopyReply}
+        onRegenerate={() => handleAction("reply")}
+        onClear={handleClearReply}
+        copied={copied}
+        regenerating={activeAction === "reply"}
+      />
+    )}
+
+    {activeTab === "tasks" && (
+      <TaskCard tasks={tasks} />
+    )}
+
+  </div>
+
+</div>
     </section>
   );
 }
