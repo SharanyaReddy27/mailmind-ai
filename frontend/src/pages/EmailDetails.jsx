@@ -29,6 +29,7 @@ function EmailDetails() {
   const [tasks, setTasks] = useState(null);
   const [activeAction, setActiveAction] = useState("");
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
 
   useEffect(() => {
     api
@@ -218,7 +219,11 @@ const handleClearReply = () => {
       <div className="email-actions">
         <button
           type="button"
-          onClick={() => handleAction("summarize")}
+          onClick={() => {
+  setActiveTab("summary");
+  handleAction("summarize");
+}}
+         
           disabled={activeAction === "summarize"}
         >
           {activeAction === "summarize"
@@ -251,7 +256,10 @@ const handleClearReply = () => {
 
   <button
     type="button"
-    onClick={() => handleAction("reply")}
+   onClick={() => {
+  setActiveTab("reply");
+  handleAction("reply");
+}}
     disabled={activeAction === "reply"}
   >
     {activeAction === "reply"
@@ -263,7 +271,10 @@ const handleClearReply = () => {
 
         <button
           type="button"
-          onClick={() => handleAction("tasks")}
+        onClick={() => {
+  setActiveTab("tasks");
+  handleAction("tasks");
+}}
           disabled={activeAction === "tasks"}
         >
           {activeAction === "tasks"
@@ -276,21 +287,62 @@ const handleClearReply = () => {
         <ErrorMessage title="AI request failed" message={error} />
       )}
 
-      <div className="results-stack">
-        <SummaryCard title="AI Summary" content={summary} />
+      <div className="ai-workspace">
 
+  <div className="ai-tabs">
+    <button
+  className={activeTab === "summary" ? "tab active" : "tab"}
+  disabled={activeAction !== ""}
+      onClick={() => setActiveTab("summary")}
+    >
+      Summary
+    </button>
+
+    <button
+      className={activeTab === "reply" ? "tab active" : "tab"}
+      disabled={activeAction !== ""}
+      onClick={() => setActiveTab("reply")}
+    >
+      Reply
+    </button>
+
+    <button
+      className={activeTab === "tasks" ? "tab active" : "tab"}
+      onClick={() => setActiveTab("tasks")}
+      disabled={activeAction !== ""}
+    >
+      Tasks
+    </button>
+  </div>
+
+  <div className="tab-content">
+
+    {activeTab === "summary" && (
+      <SummaryCard
+        title="AI Summary"
+        content={summary}
+      />
+    )}
+
+    {activeTab === "reply" && (
       <ReplyCard
-  reply={generatedReply}
-  onChangeReply={handleChangeReply}
-  onCopy={handleCopyReply}
-  onRegenerate={() => handleAction("reply")}
-  onClear={handleClearReply}
-  copied={copied}
-  regenerating={activeAction === "reply"}
-/>
+        reply={generatedReply}
+        onChangeReply={handleChangeReply}
+        onCopy={handleCopyReply}
+        onRegenerate={() => handleAction("reply")}
+        onClear={handleClearReply}
+        copied={copied}
+        regenerating={activeAction === "reply"}
+      />
+    )}
 
-        <TaskCard tasks={tasks} />
-      </div>
+    {activeTab === "tasks" && (
+      <TaskCard tasks={tasks} />
+    )}
+
+  </div>
+
+</div>
     </section>
   );
 }
