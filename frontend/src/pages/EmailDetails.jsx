@@ -26,7 +26,7 @@ function EmailDetails() {
   const [summary, setSummary] = useState("");
   const [generatedReply, setGeneratedReply] = useState("");
   const [tone, setTone] = useState("professional");
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState(null);
   const [activeAction, setActiveAction] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -66,12 +66,12 @@ function EmailDetails() {
         const result = await summarizeEmail(email);
         setSummary(result || "No summary returned.");
         setGeneratedReply("");
-        setTasks([]);
+        setTasks(null);
       } else if (action === "reply") {
         const result = await generateReply(email, tone);
         setGeneratedReply(result || "No reply returned.");
         setSummary("");
-        setTasks([]);
+        setTasks(null);
       } else if (action === "tasks") {
         const result = await extractTasks(email);
         setTasks(result || []);
@@ -81,13 +81,17 @@ function EmailDetails() {
   } catch (requestError) {
  if (action === "reply") {
   setSummary("");
-  setTasks([]);
+  setTasks(null);
   setGeneratedReply("");
 
   setError(
     "We couldn't generate a reply right now. Please try again."
   );
-} else {
+}
+else if (action === "tasks") {
+    setError("Couldn't extract tasks. Please try again.");
+}
+ else {
     setError(
       requestError.message ||
         "AI request failed. Make sure the backend is running."
@@ -97,6 +101,7 @@ function EmailDetails() {
     setGeneratedReply("");
     setTasks([]);
   }
+  
 } finally {
       setActiveAction("");
     }
@@ -261,7 +266,9 @@ const handleClearReply = () => {
           onClick={() => handleAction("tasks")}
           disabled={activeAction === "tasks"}
         >
-          {activeAction === "tasks" ? "Extracting..." : "Extract Tasks"}
+          {activeAction === "tasks"
+    ? "Extracting tasks..."
+    : "Extract Tasks"}
         </button>
       </div>
 
