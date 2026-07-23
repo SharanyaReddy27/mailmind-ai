@@ -1,20 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, CheckSquare, Sparkles } from "lucide-react";
 import api from "../services/api";
 import {
   extractTasks,
   generateReply,
   summarizeEmail,
 } from "../services/aiService";
+import Avatar from "../components/Avatar";
 import ErrorMessage from "../components/ErrorMessage";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ReplyCard from "../components/ReplyCard";
 import SummaryCard from "../components/SummaryCard";
 import TaskCard from "../components/TaskCard";
+
 const TONE_OPTIONS = [
   { value: "professional", label: "Professional" },
   { value: "friendly", label: "Friendly" },
   { value: "concise", label: "Concise" },
+];
+
+const TABS = [
+  { value: "summary", label: "Summary" },
+  { value: "reply", label: "Reply" },
+  { value: "tasks", label: "Tasks" },
 ];
 
 function EmailDetails() {
@@ -161,6 +171,8 @@ const handleClearReply = () => {
   const priorityClass = (email.priority || "medium").toLowerCase();
   const body = email.body || email.content || email.message || "";
   const receivedAt = email.receivedAt || email.date || email.createdAt || "";
+  const senderName =
+    email.senderName || email.sender || email.senderEmail || "Unknown sender";
 
   const formatDate = (value) => {
     if (!value) {
@@ -182,167 +194,203 @@ const handleClearReply = () => {
   return (
     <section className="email-details">
       <Link to="/inbox" className="back-link">
-        ← Back to Inbox
+        <ArrowLeft size={15} strokeWidth={2.25} />
+        Back to Inbox
       </Link>
 
-      <div className="email-details-header">
-        <div>
-          <h1>{email.subject}</h1>
+      <motion.div
+        className="email-details-grid"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className="email-details-main">
+          <div className="email-details-header">
+            <div className="email-details-identity">
+              <Avatar name={senderName} size={52} />
+              <div>
+                <h1>{email.subject}</h1>
+                <p>
+                  From: <strong>{senderName}</strong>
+                </p>
+                <p>To: {email.recipient || email.to || "Unknown recipient"}</p>
+                <p className="detail-meta">{formatDate(receivedAt)}</p>
+              </div>
+            </div>
 
-          <p>
-            From:{" "}
-            {email.senderName ||
-              email.sender ||
-              email.senderEmail ||
-              "Unknown sender"}
-          </p>
+            {email.priority && (
+              <span className={`priority priority--${priorityClass}`}>
+                {email.priority}
+              </span>
+            )}
+          </div>
 
-          <p>To: {email.recipient || email.to || "Unknown recipient"}</p>
+          <div className="email-body-card">
+            <h3>Email Body</h3>
+            <p className="email-body">{body}</p>
+          </div>
 
-          <p className="detail-meta">{formatDate(receivedAt)}</p>
+          {error && <ErrorMessage title="AI request failed" message={error} />}
         </div>
 
-        {email.priority && (
-          <span className={`priority ${priorityClass}`}>
-            {email.priority}
-          </span>
-        )}
-      </div>
+        <aside className="ai-workspace">
+          <div className="ai-workspace-header">
+            <span className="ai-workspace-eyebrow">
+              <Sparkles size={13} strokeWidth={2.25} />
+              AI workspace
+            </span>
+            <p>Summarize, draft a reply, or pull out tasks from this email.</p>
+          </div>
 
-      <hr />
+          <div className="email-actions">
+            <button
+              type="button"
+              className="ai-action-button"
+              onClick={() => {
+                setActiveTab("summary");
+                handleAction("summarize");
+              }}
+              disabled={activeAction === "summarize"}
+            >
+              <Sparkles size={14} strokeWidth={2.25} />
+              {activeAction === "summarize" ? "Summarizing..." : "Summarize"}
+            </button>
 
-      <div className="email-body-card">
-        <h3>Email Body</h3>
-        <p className="email-body">{body}</p>
-      </div>
+            <div className="reply-control-group">
+              <div className="tone-selector" role="group" aria-label="Reply tone">
+                {TONE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`tone-option ${tone === option.value ? "active" : ""}`}
+                    onClick={() => setTone(option.value)}
+                    aria-pressed={tone === option.value}
+                    disabled={activeAction === "reply"}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
 
-      <div className="email-actions">
-        <button
-          type="button"
-          onClick={() => {
-  setActiveTab("summary");
-  handleAction("summarize");
-}}
-         
-          disabled={activeAction === "summarize"}
-        >
-          {activeAction === "summarize"
-            ? "Summarizing..."
-            : "Summarize"}
-        </button>
+              <button
+                type="button"
+                className="ai-action-button"
+                onClick={() => {
+                  setActiveTab("reply");
+                  handleAction("reply");
+                }}
+                disabled={activeAction === "reply"}
+              >
+                {activeAction === "reply" ? "Generating reply..." : "Generate Reply"}
+              </button>
+            </div>
 
-        <div className="reply-control-group">
+            <button
+              type="button"
+              className="ai-action-button"
+              onClick={() => {
+                setActiveTab("tasks");
+                handleAction("tasks");
+              }}
+              disabled={activeAction === "tasks"}
+            >
+              <CheckSquare size={14} strokeWidth={2.25} />
+              {activeAction === "tasks" ? "Extracting tasks..." : "Extract Tasks"}
+            </button>
+          </div>
 
-  <div
-    className="tone-selector"
-    role="group"
-    aria-label="Reply tone"
-  >
-    {TONE_OPTIONS.map((option) => (
-      <button
-        key={option.value}
-        type="button"
-        className={`tone-option ${
-          tone === option.value ? "active" : ""
-        }`}
-        onClick={() => setTone(option.value)}
-        aria-pressed={tone === option.value}
-        disabled={activeAction === "reply"}
-      >
-        {option.label}
-      </button>
-    ))}
-  </div>
+          <div className="ai-tabs">
+            {TABS.map(({ value, label }) => (
+              <button
+                key={value}
+                className={activeTab === value ? "tab active" : "tab"}
+                disabled={activeAction !== ""}
+                onClick={() => setActiveTab(value)}
+              >
+                {label}
+                {activeTab === value && (
+                  <motion.span className="tab-indicator" layoutId="tab-indicator" />
+                )}
+              </button>
+            ))}
+          </div>
 
-  <button
-    type="button"
-   onClick={() => {
-  setActiveTab("reply");
-  handleAction("reply");
-}}
-    disabled={activeAction === "reply"}
-  >
-    {activeAction === "reply"
-      ? "Generating reply..."
-      : "Generate Reply"}
-  </button>
+          <div className="tab-content">
+            <AnimatePresence mode="wait">
+              {activeAction !== "" && (
+                <motion.div
+                  key="ai-loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="ai-thinking"
+                >
+                  <span className="signal-thread signal-thread--pulse" />
+                  <span>Reading the email...</span>
+                </motion.div>
+              )}
 
-</div>
+              {activeAction === "" && activeTab === "summary" && summary && (
+                <motion.div
+                  key="summary"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <SummaryCard title="AI Summary" content={summary} />
+                </motion.div>
+              )}
 
-        <button
-          type="button"
-        onClick={() => {
-  setActiveTab("tasks");
-  handleAction("tasks");
-}}
-          disabled={activeAction === "tasks"}
-        >
-          {activeAction === "tasks"
-    ? "Extracting tasks..."
-    : "Extract Tasks"}
-        </button>
-      </div>
+              {activeAction === "" && activeTab === "reply" && generatedReply && (
+                <motion.div
+                  key="reply"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <ReplyCard
+                    reply={generatedReply}
+                    onChangeReply={handleChangeReply}
+                    onCopy={handleCopyReply}
+                    onRegenerate={() => handleAction("reply")}
+                    onClear={handleClearReply}
+                    copied={copied}
+                    regenerating={activeAction === "reply"}
+                  />
+                </motion.div>
+              )}
 
-      {error && (
-        <ErrorMessage title="AI request failed" message={error} />
-      )}
+              {activeAction === "" && activeTab === "tasks" && tasks !== null && (
+                <motion.div
+                  key="tasks"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <TaskCard tasks={tasks} />
+                </motion.div>
+              )}
 
-      <div className="ai-workspace">
-
-  <div className="ai-tabs">
-    <button
-  className={activeTab === "summary" ? "tab active" : "tab"}
-  disabled={activeAction !== ""}
-      onClick={() => setActiveTab("summary")}
-    >
-      Summary
-    </button>
-
-    <button
-      className={activeTab === "reply" ? "tab active" : "tab"}
-      disabled={activeAction !== ""}
-      onClick={() => setActiveTab("reply")}
-    >
-      Reply
-    </button>
-
-    <button
-      className={activeTab === "tasks" ? "tab active" : "tab"}
-      onClick={() => setActiveTab("tasks")}
-      disabled={activeAction !== ""}
-    >
-      Tasks
-    </button>
-  </div>
-
-  <div className="tab-content">
-
-    {activeTab === "summary" && (
-      <SummaryCard
-        title="AI Summary"
-        content={summary}
-      />
-    )}
-
-    {activeTab === "reply" && (
-      <ReplyCard
-        reply={generatedReply}
-        onChangeReply={handleChangeReply}
-        onCopy={handleCopyReply}
-        onRegenerate={() => handleAction("reply")}
-        onClear={handleClearReply}
-        copied={copied}
-        regenerating={activeAction === "reply"}
-      />
-    )}
-
-    {activeTab === "tasks" && (
-      <TaskCard tasks={tasks} />
-    )}
-
-  </div>
-
-</div>
+              {activeAction === "" &&
+                ((activeTab === "summary" && !summary) ||
+                  (activeTab === "reply" && !generatedReply) ||
+                  (activeTab === "tasks" && tasks === null)) && (
+                  <motion.p
+                    key="empty"
+                    className="ai-tab-empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    Run an action above to see results here.
+                  </motion.p>
+                )}
+            </AnimatePresence>
+          </div>
+        </aside>
+      </motion.div>
     </section>
   );
 }

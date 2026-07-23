@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import '../App.css';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, Mail, RefreshCw } from 'lucide-react';
 
 function Settings() {
   const { currentUser } = useAuth();
@@ -114,7 +115,9 @@ function Settings() {
 
       <div className="integration-card">
         <div className="integration-card-left">
-          <div className="integration-icon">📧</div>
+          <div className="integration-icon">
+            <Mail size={20} strokeWidth={2} />
+          </div>
           <div>
             <h3>Gmail</h3>
             <p>Sync recent emails from your Gmail account (read-only).</p>
@@ -127,12 +130,16 @@ function Settings() {
 
           {!loading && status && status.connected ? (
             <div>
-              <p><strong>Connected as:</strong> {status.googleEmail}</p>
-              <p><strong>Connected at:</strong> {status.connectedAt || '—'}</p>
-              <p><strong>Last synced:</strong> {status.lastSyncedAt || '—'}</p>
+              <div className="integration-status-line">
+                <CheckCircle2 size={15} strokeWidth={2.25} className="integration-status-icon" />
+                <span>Connected as {status.googleEmail}</span>
+              </div>
+              <p className="integration-detail">Connected at: {status.connectedAt || '—'}</p>
+              <p className="integration-detail">Last synced: {status.lastSyncedAt || '—'}</p>
 
               <div className="integration-actions">
                 <button type="button" disabled={syncing} onClick={handleSync} className="primary">
+                  <RefreshCw size={14} strokeWidth={2.25} />
                   {syncing ? 'Syncing…' : 'Sync Emails'}
                 </button>
                 <button type="button" onClick={() => navigate('/inbox')}>Open Inbox</button>
@@ -151,10 +158,12 @@ function Settings() {
           {syncResult && (
             <div className="sync-result">
               <p>{syncResult.message}</p>
-              <p>Fetched: {syncResult.fetched}</p>
-              <p>Created: {syncResult.created}</p>
-              <p>Skipped: {syncResult.skipped}</p>
-              <p>Failed: {syncResult.failed}</p>
+              <div className="sync-result-grid">
+                <span>Fetched <strong>{syncResult.fetched}</strong></span>
+                <span>Created <strong>{syncResult.created}</strong></span>
+                <span>Skipped <strong>{syncResult.skipped}</strong></span>
+                <span>Failed <strong>{syncResult.failed}</strong></span>
+              </div>
             </div>
           )}
         </div>

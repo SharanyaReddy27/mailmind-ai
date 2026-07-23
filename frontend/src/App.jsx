@@ -1,13 +1,12 @@
-
 import {
   BrowserRouter,
-  Link,
   Navigate,
   Route,
   Routes,
 } from "react-router-dom";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import Sidebar from "./components/Sidebar";
 import { useAuth } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import EmailDetails from "./pages/EmailDetails";
@@ -16,112 +15,90 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import "./App.css";
 import Settings from "./pages/Settings";
+
 function AppShell() {
   const { currentUser, logout } = useAuth();
 
   return (
-    <div className="app">
-      <nav>
-        <Link to="/" className="logo-link">
-          <h2>MailMind AI</h2>
-        </Link>
+    <div className={`app ${currentUser ? "app--workspace" : "app--auth"}`}>
+      {currentUser && <Sidebar currentUser={currentUser} onLogout={logout} />}
 
-        <div className="nav-links">
-          {currentUser ? (
-            <>
-              <Link to="/dashboard">Dashboard</Link>
-              <Link to="/settings">Settings</Link>
-              <Link to="/inbox">Inbox</Link>
-              <span className="nav-user">👤 {currentUser.name || currentUser.email || "User"}</span>
-              <button type="button" className="nav-logout" onClick={logout}>
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login">Login</Link>
-              <Link to="/register">Register</Link>
-            </>
-          )}
-        </div>
-      </nav>
+      <main className="app-main">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to={currentUser ? "/dashboard" : "/login"}
+                replace
+              />
+            }
+          />
 
-      <main>
-      <Routes>
-  <Route
-    path="/"
-    element={
-      <Navigate
-        to={currentUser ? "/dashboard" : "/login"}
-        replace
-      />
-    }
-  />
+          <Route
+            path="/login"
+            element={
+              currentUser
+                ? <Navigate to="/dashboard" replace />
+                : <Login />
+            }
+          />
 
-  <Route
-    path="/login"
-    element={
-      currentUser
-        ? <Navigate to="/dashboard" replace />
-        : <Login />
-    }
-  />
+          <Route
+            path="/register"
+            element={
+              currentUser
+                ? <Navigate to="/dashboard" replace />
+                : <Register />
+            }
+          />
 
-  <Route
-    path="/register"
-    element={
-      currentUser
-        ? <Navigate to="/dashboard" replace />
-        : <Register />
-    }
-  />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="/dashboard"
-    element={
-      <ProtectedRoute>
-        <Dashboard />
-      </ProtectedRoute>
-    }
-  />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="/settings"
-    element={
-      <ProtectedRoute>
-        <Settings />
-      </ProtectedRoute>
-    }
-  />
+          <Route
+            path="/inbox"
+            element={
+              <ProtectedRoute>
+                <Inbox />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="/inbox"
-    element={
-      <ProtectedRoute>
-        <Inbox />
-      </ProtectedRoute>
-    }
-  />
+          <Route
+            path="/emails/:id"
+            element={
+              <ProtectedRoute>
+                <EmailDetails />
+              </ProtectedRoute>
+            }
+          />
 
-  <Route
-    path="/emails/:id"
-    element={
-      <ProtectedRoute>
-        <EmailDetails />
-      </ProtectedRoute>
-    }
-  />
-
-  <Route
-    path="*"
-    element={
-      <Navigate
-        to={currentUser ? "/dashboard" : "/login"}
-        replace
-      />
-    }
-  />
-</Routes>
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to={currentUser ? "/dashboard" : "/login"}
+                replace
+              />
+            }
+          />
+        </Routes>
       </main>
     </div>
   );

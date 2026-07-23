@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 import api from "../services/api";
 import EmailCard from "../components/EmailCard";
 import ErrorMessage from "../components/ErrorMessage";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { InboxSkeleton } from "../components/LoadingSpinner";
 
 function Inbox() {
   const [emails, setEmails] = useState([]);
@@ -36,7 +38,13 @@ function Inbox() {
   if (loading) {
     return (
       <div className="page-shell">
-        <LoadingSpinner label="Loading inbox..." />
+        <div className="page-header">
+          <div>
+            <h1>MailMind Inbox</h1>
+            <p>Your latest messages in one place.</p>
+          </div>
+        </div>
+        <InboxSkeleton />
       </div>
     );
   }
@@ -50,6 +58,7 @@ function Inbox() {
         </div>
         <div className="page-header-actions">
           <button type="button" className="refresh-button" onClick={loadEmails}>
+            <RefreshCw size={14} strokeWidth={2.25} />
             Refresh
           </button>
           <span className="pill">{emails.length} emails</span>
@@ -59,14 +68,34 @@ function Inbox() {
       {error && <ErrorMessage title="Connection issue" message={error} />}
 
       {!error && emails.length === 0 && (
-        <div className="empty-state">No emails found.</div>
+        <div className="empty-state empty-state--panel">
+          <p>No emails found.</p>
+          <span>Connect Gmail from Settings or check back soon.</span>
+        </div>
       )}
 
-      <div className="inbox-grid">
+      <motion.div
+        className="inbox-grid"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.035 } },
+        }}
+      >
         {emails.map((email) => (
-          <EmailCard key={email._id || email.id} email={email} />
+          <motion.div
+            key={email._id || email.id}
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              visible: { opacity: 1, y: 0 },
+            }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <EmailCard email={email} />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

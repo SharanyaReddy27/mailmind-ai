@@ -1,3 +1,5 @@
+import { Copy, RotateCcw, X } from "lucide-react";
+
 function ReplyCard({
   reply,
   onChangeReply,
@@ -12,7 +14,7 @@ function ReplyCard({
   }
 
   return (
-    <div className="result-card reply-card">
+    <div className="result-card reply-card signal-card">
       <div className="result-card-header">
         <span className="result-icon">✉</span>
         <h4>AI Reply</h4>
@@ -31,11 +33,8 @@ function ReplyCard({
       />
 
       <div className="reply-toolbar">
-        <button
-          type="button"
-          className="copy-button"
-          onClick={onCopy}
-        >
+        <button type="button" className="copy-button" onClick={onCopy}>
+          <Copy size={14} strokeWidth={2.25} />
           Copy
         </button>
 
@@ -45,6 +44,7 @@ function ReplyCard({
           onClick={onRegenerate}
           disabled={regenerating}
         >
+          <RotateCcw size={14} strokeWidth={2.25} />
           {regenerating ? "Regenerating..." : "Regenerate"}
         </button>
 
@@ -54,6 +54,7 @@ function ReplyCard({
           onClick={onClear}
           disabled={regenerating}
         >
+          <X size={14} strokeWidth={2.25} />
           Clear
         </button>
       </div>

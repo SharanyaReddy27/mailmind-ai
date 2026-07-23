@@ -1,7 +1,7 @@
 function InputField({ label, name, type = "text", value, onChange, required = false, autoComplete }) {
   return (
     <label className="field">
-      <span>{label}</span>
+      <span className="field-label">{label}</span>
       <input
         className="field-input"
         name={name}
@@ -10,6 +10,7 @@ function InputField({ label, name, type = "text", value, onChange, required = fa
         onChange={onChange}
         required={required}
         autoComplete={autoComplete}
+        placeholder=" "
       />
     </label>
   );

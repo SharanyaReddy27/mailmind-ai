@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CalendarDays, CheckSquare, Copy, User } from "lucide-react";
 
 function TaskCard({ tasks }) {
   const [checkedTasks, setCheckedTasks] = useState({});
@@ -41,9 +42,11 @@ function TaskCard({ tasks }) {
 
   if (tasks.length === 0) {
     return (
-      <div className="result-card task-card">
+      <div className="result-card task-card signal-card">
         <div className="result-card-header">
-          <span className="result-icon">☑</span>
+          <span className="result-icon">
+            <CheckSquare size={14} strokeWidth={2.25} />
+          </span>
           <h4>Extracted Tasks</h4>
         </div>
 
@@ -55,9 +58,11 @@ function TaskCard({ tasks }) {
   }
 
   return (
-    <div className="result-card task-card">
+    <div className="result-card task-card signal-card">
       <div className="result-card-header">
-        <span className="result-icon">☑</span>
+        <span className="result-icon">
+          <CheckSquare size={14} strokeWidth={2.25} />
+        </span>
         <h4>Extracted Tasks</h4>
       </div>
 
@@ -76,9 +81,7 @@ function TaskCard({ tasks }) {
 
               <div className={`task-content ${checked ? "task-done" : ""}`}>
                 <div className="task-top-row">
-                  <span className="task-title">
-                    {task.title}
-                  </span>
+                  <span className="task-title">{task.title}</span>
 
                   <span
                     className={`task-priority priority-${task.priority?.toLowerCase()}`}
@@ -88,21 +91,21 @@ function TaskCard({ tasks }) {
                 </div>
 
                 {task.description && (
-                  <p className="task-description">
-                    {task.description}
-                  </p>
+                  <p className="task-description">{task.description}</p>
                 )}
 
                 <div className="task-meta-row">
                   {task.deadline && (
                     <span>
-                      📅 {task.deadline}
+                      <CalendarDays size={12} strokeWidth={2.25} />
+                      {task.deadline}
                     </span>
                   )}
 
                   {task.assignee && (
                     <span>
-                      👤 {task.assignee}
+                      <User size={12} strokeWidth={2.25} />
+                      {task.assignee}
                     </span>
                   )}
                 </div>
@@ -112,10 +115,8 @@ function TaskCard({ tasks }) {
         })}
       </div>
 
-      <button
-        className="secondary-button copy-all-button"
-        onClick={handleCopyAll}
-      >
+      <button className="secondary-button copy-all-button" onClick={handleCopyAll}>
+        <Copy size={14} strokeWidth={2.25} />
         {copied ? "Copied!" : "Copy all tasks"}
       </button>
     </div>
