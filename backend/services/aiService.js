@@ -241,11 +241,12 @@ const summarizeEmail = async (subject, body) => {
 
       const delay = 2000 * attempt;
 
-      console.warn(
-        `Gemini is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
-      );
-      throw createAIServiceError(error);
-      await wait(delay);
+   console.warn(
+  `Gemini is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
+);
+
+await wait(delay);
+continue;
     }
   }
 
@@ -386,15 +387,14 @@ const generateEmailReply = async ({
         throw busyError;
       }
 
-      console.warn(
-        "Gemini reply generation is temporarily unavailable. Retrying..."
-      );
+    console.warn(
+  "Gemini reply generation is temporarily unavailable. Retrying..."
+);
 
-      await wait(1000);
-    }
-    throw createAIServiceError(error);
+await wait(1000);
+continue;
   }
-
+  }
   const error = new Error(
     "Failed to generate email reply"
   );
@@ -471,7 +471,7 @@ const extractEmailTasks = async (body) => {
         ? task.priority
         : "Medium",
     }));
-    throw createAIServiceError(error);
+   
   return tasks;
 };
 
