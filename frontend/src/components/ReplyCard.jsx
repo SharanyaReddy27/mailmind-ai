@@ -1,10 +1,18 @@
-import { Copy, RotateCcw, X } from "lucide-react";
+import { Copy, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+
+const TONE_LABELS = {
+  professional: "Professional",
+  friendly: "Friendly",
+  concise: "Concise",
+};
 
 function ReplyCard({
   reply,
+  tone,
   onChangeReply,
   onCopy,
   onRegenerate,
+  onChangeTone,
   onClear,
   copied,
   regenerating,
@@ -18,6 +26,7 @@ function ReplyCard({
       <div className="result-card-header">
         <span className="result-icon">✉</span>
         <h4>AI Reply</h4>
+        {tone && <span className="reply-tone-badge">{TONE_LABELS[tone] || tone}</span>}
       </div>
 
       <label htmlFor="generated-reply" className="reply-label">
@@ -46,6 +55,16 @@ function ReplyCard({
         >
           <RotateCcw size={14} strokeWidth={2.25} />
           {regenerating ? "Regenerating..." : "Regenerate"}
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onChangeTone}
+          disabled={regenerating}
+        >
+          <SlidersHorizontal size={14} strokeWidth={2.25} />
+          Change Tone
         </button>
 
         <button

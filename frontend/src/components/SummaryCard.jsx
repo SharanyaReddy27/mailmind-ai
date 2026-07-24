@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
+import { Copy, RotateCcw, Sparkles } from "lucide-react";
 
-function SummaryCard({ title, content }) {
+function SummaryCard({ title, content, onCopy, onRegenerate, copied, regenerating }) {
   if (!content) {
     return null;
   }
@@ -14,6 +14,35 @@ function SummaryCard({ title, content }) {
         <h4>{title}</h4>
       </div>
       <p className="signal-card-body">{content}</p>
+
+      {(onCopy || onRegenerate) && (
+        <div className="reply-toolbar">
+          {onCopy && (
+            <button type="button" className="copy-button" onClick={onCopy}>
+              <Copy size={14} strokeWidth={2.25} />
+              Copy Summary
+            </button>
+          )}
+
+          {onRegenerate && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onRegenerate}
+              disabled={regenerating}
+            >
+              <RotateCcw size={14} strokeWidth={2.25} />
+              {regenerating ? "Regenerating..." : "Regenerate"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {copied && (
+        <p className="copy-success" role="status">
+          ✓ Copied to clipboard
+        </p>
+      )}
     </div>
   );
 }

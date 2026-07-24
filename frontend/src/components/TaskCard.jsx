@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { CalendarDays, CheckSquare, Copy, User } from "lucide-react";
+import { CalendarDays, CheckSquare, Copy, Download, RotateCcw, User } from "lucide-react";
 
-function TaskCard({ tasks }) {
+function TaskCard({ tasks, onRetry, retrying }) {
   const [checkedTasks, setCheckedTasks] = useState({});
   const [copied, setCopied] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
   if (tasks === null) {
     return null;
@@ -16,17 +17,15 @@ function TaskCard({ tasks }) {
     }));
   };
 
+  const formatTask = (task) => {
+    const lines = [`- ${task.title}`];
+    if (task.deadline) lines.push(`Deadline: ${task.deadline}`);
+    if (task.priority) lines.push(`Priority: ${task.priority}`);
+    return lines.join("\n");
+  };
+
   const handleCopyAll = async () => {
-    const text = tasks
-      .map((task) => {
-        const lines = [`- ${task.title}`];
-
-        if (task.deadline) lines.push(`Deadline: ${task.deadline}`);
-        if (task.priority) lines.push(`Priority: ${task.priority}`);
-
-        return lines.join("\n");
-      })
-      .join("\n\n");
+    const text = tasks.map(formatTask).join("\n\n");
 
     try {
       await navigator.clipboard.writeText(text);
@@ -38,6 +37,29 @@ function TaskCard({ tasks }) {
     } catch {
       setCopied(false);
     }
+  };
+
+  const handleCopyOne = async (task, index) => {
+    try {
+      await navigator.clipboard.writeText(formatTask(task));
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 1200);
+    } catch {
+      setCopiedIndex(null);
+    }
+  };
+
+  const handleExport = () => {
+    const text = tasks.map(formatTask).join("\n\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "mailmind-tasks.txt";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (tasks.length === 0) {
@@ -53,6 +75,18 @@ function TaskCard({ tasks }) {
         <p className="empty-state">
           No actionable tasks found in this email.
         </p>
+
+        {onRetry && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            <RotateCcw size={14} strokeWidth={2.25} />
+            {retrying ? "Retrying..." : "Retry"}
+          </button>
+        )}
       </div>
     );
   }
@@ -110,15 +144,45 @@ function TaskCard({ tasks }) {
                   )}
                 </div>
               </div>
+
+              <button
+                type="button"
+                className="task-copy-button"
+                onClick={() => handleCopyOne(task, index)}
+                aria-label="Copy task"
+                title="Copy task"
+              >
+                <Copy size={13} strokeWidth={2.25} />
+                {copiedIndex === index && <span className="task-copy-tooltip">Copied</span>}
+              </button>
             </div>
           );
         })}
       </div>
 
-      <button className="secondary-button copy-all-button" onClick={handleCopyAll}>
-        <Copy size={14} strokeWidth={2.25} />
-        {copied ? "Copied!" : "Copy all tasks"}
-      </button>
+      <div className="reply-toolbar">
+        <button className="secondary-button" onClick={handleCopyAll}>
+          <Copy size={14} strokeWidth={2.25} />
+          {copied ? "Copied!" : "Copy all"}
+        </button>
+
+        <button className="secondary-button" onClick={handleExport}>
+          <Download size={14} strokeWidth={2.25} />
+          Export
+        </button>
+
+        {onRetry && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            <RotateCcw size={14} strokeWidth={2.25} />
+            {retrying ? "Retrying..." : "Retry"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
