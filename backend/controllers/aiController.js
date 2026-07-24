@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+const Email = require("../models/Email");
 const {
   summarizeEmail: generateAISummary,
   generateEmailReply,
@@ -9,6 +11,25 @@ const ALLOWED_REPLY_TONES = [
   "friendly",
   "concise",
 ];
+
+// Best-effort persistence of an AI result against the source email so the
+// dashboard can show real recent activity. Silently no-ops if emailId is
+// missing/invalid or doesn't belong to the requesting user - AI results are
+// still returned to the caller either way.
+const persistAiResult = async (req, emailId, update) => {
+  if (!emailId || !mongoose.Types.ObjectId.isValid(emailId) || !req.user) {
+    return;
+  }
+
+  try {
+    await Email.findOneAndUpdate(
+      { _id: emailId, userId: req.user._id },
+      update
+    );
+  } catch (error) {
+    console.error("Failed to persist AI result:", error.message);
+  }
+};
 
 const sendControllerError = (res, error, fallbackMessage) => {
   const statusCode =
@@ -25,7 +46,7 @@ const sendControllerError = (res, error, fallbackMessage) => {
 
 const summarizeEmail = async (req, res) => {
   try {
-    const { subject = "", body } = req.body || {};
+    const { subject = "", body, emailId } = req.body || {};
 
     const cleanSubject =
       typeof subject === "string"
@@ -48,6 +69,11 @@ const summarizeEmail = async (req, res) => {
       cleanSubject,
       cleanBody
     );
+
+    await persistAiResult(req, emailId, {
+      aiSummary: summary,
+      aiSummaryAt: new Date(),
+    });
 
     return res.status(200).json({
       success: true,
@@ -74,6 +100,7 @@ const generateReply = async (req, res) => {
       body,
       senderName = "",
       tone = "professional",
+      emailId,
     } = req.body || {};
 
     if (typeof body !== "string" || !body.trim()) {
@@ -105,6 +132,12 @@ const generateReply = async (req, res) => {
       tone: normalizedTone,
     });
 
+    await persistAiResult(req, emailId, {
+      aiReply: reply,
+      aiReplyTone: normalizedTone,
+      aiReplyAt: new Date(),
+    });
+
     return res.status(200).json({
       success: true,
       reply,
@@ -125,7 +158,7 @@ const generateReply = async (req, res) => {
 
 const extractTasks = async (req, res) => {
   try {
-    const { body } = req.body || {};
+    const { body, emailId } = req.body || {};
 
     if (typeof body !== "string" || !body.trim()) {
       return res.status(400).json({
@@ -135,6 +168,11 @@ const extractTasks = async (req, res) => {
     }
 
     const tasks = await extractEmailTasks(body);
+
+    await persistAiResult(req, emailId, {
+      aiTasks: tasks,
+      aiTasksAt: new Date(),
+    });
 
     return res.status(200).json({
       success: true,

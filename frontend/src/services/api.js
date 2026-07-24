@@ -59,7 +59,13 @@ export const register = async (payload) => {
 export const getCurrentUser = async () => {
   try {
     const response = await api.get("/auth/me");
-    return response.data;
+    // The backend responds with { success, user: { id, name, email } }.
+    // This previously returned response.data as-is (the whole wrapper),
+    // so AuthContext stored { success, user } as the "user", and every
+    // currentUser.name / currentUser.email lookup came back undefined
+    // after a page refresh - this is why the profile showed "MailMind
+    // user" / a blank email even though login itself worked fine.
+    return response.data?.user || response.data;
   } catch (error) {
     const savedUser = localStorage.getItem("mailmind_user");
 

@@ -3,7 +3,13 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+// NOTE: the installed @google/generative-ai SDK (^0.24.1) targets the
+// v1/v1beta Gemini REST API surface. "gemini-3.5-flash" is not a model
+// string that SDK version can resolve, which was causing every AI call
+// (summarize/reply/tasks) to fail at the Gemini API call itself.
+// "gemini-2.5-flash" is a current, stable model that this SDK version
+// supports. Override via GEMINI_MODEL in backend/.env if needed.
+const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 if (!API_KEY) {
   console.warn(

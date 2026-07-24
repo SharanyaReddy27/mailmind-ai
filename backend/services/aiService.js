@@ -467,9 +467,7 @@ const extractEmailTasks = async (body) => {
         typeof task.deadline === "string" && task.deadline.trim()
           ? task.deadline.trim()
           : null,
-      priority: ["High", "Medium", "Low"].includes(task.priority)
-        ? task.priority
-        : "Medium",
+      priority: normalizePriority(task.priority),
     }));
    
   return tasks;

@@ -68,6 +68,44 @@ const emailSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+
+    // Persisted results of the last AI action run against this email, so
+    // the dashboard can surface real "recent AI activity" instead of
+    // fabricated numbers. All optional/nullable.
+    aiSummary: {
+      type: String,
+      default: null,
+    },
+    aiSummaryAt: {
+      type: Date,
+      default: null,
+    },
+    aiReply: {
+      type: String,
+      default: null,
+    },
+    aiReplyTone: {
+      type: String,
+      default: null,
+    },
+    aiReplyAt: {
+      type: Date,
+      default: null,
+    },
+    aiTasks: {
+      type: [
+        {
+          title: String,
+          deadline: String,
+          priority: String,
+        },
+      ],
+      default: [],
+    },
+    aiTasksAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
