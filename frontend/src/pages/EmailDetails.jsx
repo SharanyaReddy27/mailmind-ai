@@ -8,10 +8,19 @@ import {
   generateReply,
   summarizeEmail,
 } from "../services/aiService";
+import {
+  computeInsights,
+  detectAttachments,
+  detectDeadlines,
+  detectLinks,
+} from "../utils/emailIntelligence";
 import Avatar from "../components/Avatar";
+import AttachmentList from "../components/AttachmentList";
+import EmailInsights from "../components/EmailInsights";
 import ErrorMessage from "../components/ErrorMessage";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ReplyCard from "../components/ReplyCard";
+import SmartLinks from "../components/SmartLinks";
 import SummaryCard from "../components/SummaryCard";
 import TaskCard from "../components/TaskCard";
 
@@ -223,6 +232,12 @@ const handleClearReply = () => {
   const senderName =
     email.senderName || email.sender || email.senderEmail || "Unknown sender";
 
+  const combinedText = `${email.subject || ""}\n${body}`;
+  const links = detectLinks(combinedText);
+  const attachments = detectAttachments(combinedText);
+  const deadlines = detectDeadlines(combinedText, receivedAt);
+  const insights = computeInsights(email, { links, attachments, deadlines });
+
   const formatDate = (value) => {
     if (!value) {
       return "No date";
@@ -278,6 +293,10 @@ const handleClearReply = () => {
             <h3>Email Body</h3>
             <p className="email-body">{body}</p>
           </div>
+
+          <SmartLinks links={links} />
+          <AttachmentList attachments={attachments} />
+          <EmailInsights insights={insights} deadlines={deadlines} />
 
           {error && <ErrorMessage title="AI request failed" message={error} />}
         </div>
