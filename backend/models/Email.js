@@ -96,8 +96,10 @@ const emailSchema = new mongoose.Schema(
       type: [
         {
           title: String,
+          assignee: String,
           deadline: String,
           priority: String,
+          link: String,
         },
       ],
       default: [],
