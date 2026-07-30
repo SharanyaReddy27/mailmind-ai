@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, CheckSquare, Copy, Download, RotateCcw, User } from "lucide-react";
+import { CalendarDays, CheckSquare, Copy, Download, Link as LinkIcon, RotateCcw, User } from "lucide-react";
 
 function TaskCard({ tasks, onRetry, retrying }) {
   const [checkedTasks, setCheckedTasks] = useState({});
@@ -19,8 +19,10 @@ function TaskCard({ tasks, onRetry, retrying }) {
 
   const formatTask = (task) => {
     const lines = [`- ${task.title}`];
+    if (task.assignee) lines.push(`Assignee: ${task.assignee}`);
     if (task.deadline) lines.push(`Deadline: ${task.deadline}`);
     if (task.priority) lines.push(`Priority: ${task.priority}`);
+    if (task.link) lines.push(`Link: ${task.link}`);
     return lines.join("\n");
   };
 
@@ -141,6 +143,18 @@ function TaskCard({ tasks, onRetry, retrying }) {
                       <User size={12} strokeWidth={2.25} />
                       {task.assignee}
                     </span>
+                  )}
+
+                  {task.link && (
+                    <a
+                      href={task.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="task-link"
+                    >
+                      <LinkIcon size={12} strokeWidth={2.25} />
+                      Open link
+                    </a>
                   )}
                 </div>
               </div>
