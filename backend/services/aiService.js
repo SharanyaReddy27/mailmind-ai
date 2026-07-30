@@ -6,7 +6,7 @@ const { getAIModel } = require("../config/ai");
 
 const SUMMARY_GENERATION_CONFIG = {
   temperature: 0.1,
-  maxOutputTokens: 700,
+  maxOutputTokens: 900,
 };
 
 const wait = (milliseconds) =>
@@ -35,18 +35,29 @@ ${cleanSubject}
 EMAIL CONTENT:
 ${cleanBody}
 
-Return only 2 to 5 useful bullet points.
+Write a genuinely useful summary, not a one-line recap.
+
+Normally produce 4 to 5 bullet points. For long or detail-heavy emails you
+may use up to 6-7. Only use fewer than 3 points if the email truly contains
+almost no useful information (e.g. a one-line notification).
+
+Cover, when present in the email:
+- The main purpose of the email.
+- Important context or information the recipient needs.
+- Any action expected from the recipient.
+- Deadlines, dates, meetings, links, or attachments.
+- A final important note (e.g. what happens next, or who to contact).
 
 Rules:
 - Start each point with •
-- State the actual purpose of the email.
-- Include every important action the recipient must complete.
-- Include relevant names, dates, deadlines and links.
+- Each point must contain real, specific information from the email — no filler like "This email is about..." or restating the subject line.
+- Include relevant names, dates, deadlines and links exactly as given.
 - Ignore greetings, signatures, tracking links and legal footer text.
-- Do not write a heading.
+- Ignore advertisements and unnecessary footer content.
+- Do not write a heading like "Summary:".
 - Do not write "Analyze the Email".
 - Do not write "Bullet 1", "Purpose" or repeat these instructions.
-- Do not invent information.
+- Do not invent information that is not in the email.
 `;
 };
 const ALLOWED_REPLY_TONES = [
@@ -410,67 +421,107 @@ const extractEmailTasks = async (body) => {
   }
 
   const model = getAIModel();
+  const maximumAttempts = 3;
 
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    try {
+      const result = await model.generateContent({
+        contents: [
           {
-            text: buildTaskPrompt(body),
+            role: "user",
+            parts: [
+              {
+                text: buildTaskPrompt(body),
+              },
+            ],
           },
         ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 1000,
-      responseMimeType: "application/json",
-    },
-  });
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1000,
+          responseMimeType: "application/json",
+        },
+      });
 
-  const response = result.response;
-  const rawText = response.text();
+      const response = await result.response;
+      const rawText = response.text();
 
-  console.log(
-    "Gemini task extraction finish reason:",
-    response.candidates?.[0]?.finishReason
-  );
+      console.log(
+        "Gemini task extraction finish reason:",
+        response.candidates?.[0]?.finishReason
+      );
 
-  const cleanedText = cleanJsonResponse(rawText);
+      if (!rawText || !rawText.trim()) {
+        const emptyError = new Error(
+          "AI returned an empty task extraction response"
+        );
+        emptyError.status = 502;
+        throw emptyError;
+      }
 
-  let parsedResult;
+      const cleanedText = cleanJsonResponse(rawText);
 
-  try {
-    parsedResult = JSON.parse(cleanedText);
-  } catch (error) {
-    console.error("Invalid task JSON returned by Gemini:", rawText);
+      let parsedResult;
 
-    const parseError = new Error(
-      "AI returned an invalid task extraction response"
-    );
-    parseError.statusCode = 502;
-    throw parseError;
+      try {
+        parsedResult = JSON.parse(cleanedText);
+      } catch (parseException) {
+        console.error("Invalid task JSON returned by Gemini:", rawText);
+
+        const parseError = new Error(
+          "AI returned an invalid task extraction response"
+        );
+        parseError.status = 502;
+        throw parseError;
+      }
+
+      if (!Array.isArray(parsedResult.tasks)) {
+        const formatError = new Error(
+          "AI response does not contain a tasks array"
+        );
+        formatError.status = 502;
+        throw formatError;
+      }
+
+      const tasks = parsedResult.tasks
+        .filter((task) => task && typeof task.title === "string" && task.title.trim())
+        .map((task) => ({
+          title: task.title.trim(),
+          deadline:
+            typeof task.deadline === "string" && task.deadline.trim()
+              ? task.deadline.trim()
+              : null,
+          priority: normalizePriority(task.priority),
+        }));
+
+      return tasks;
+    } catch (error) {
+      const temporaryError = isTemporaryGeminiError(error);
+
+      if (!temporaryError) {
+        error.statusCode = error.statusCode || error.status || 502;
+        throw error;
+      }
+
+      if (attempt === maximumAttempts) {
+        const busyError = new Error(
+          "AI service is currently busy. Please try again shortly."
+        );
+        busyError.statusCode = 503;
+        throw busyError;
+      }
+
+      const delay = 1000 * attempt;
+      console.warn(
+        `Gemini task extraction is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
+      );
+      await wait(delay);
+    }
   }
 
-  if (!Array.isArray(parsedResult.tasks)) {
-    const formatError = new Error("AI response does not contain a tasks array");
-    formatError.statusCode = 502;
-    throw formatError;
-  }
-
-  const tasks = parsedResult.tasks
-    .filter((task) => task && typeof task.title === "string")
-    .map((task) => ({
-      title: task.title.trim(),
-      deadline:
-        typeof task.deadline === "string" && task.deadline.trim()
-          ? task.deadline.trim()
-          : null,
-      priority: normalizePriority(task.priority),
-    }));
-   
-  return tasks;
+  const error = new Error("Failed to extract tasks from email");
+  error.statusCode = 502;
+  throw error;
 };
 
 module.exports = {
