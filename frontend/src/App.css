@@ -1561,6 +1561,21 @@
   color: var(--text-primary) !important;
 }
 
+.summary-bullet-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.summary-bullet-list li::marker {
+  color: var(--signal-coral);
+}
+
 .reply-label {
   display: block;
   font-size: 11px;

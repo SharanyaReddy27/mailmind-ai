@@ -5,6 +5,11 @@ function SummaryCard({ title, content, onCopy, onRegenerate, copied, regeneratin
     return null;
   }
 
+  const bullets = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
   return (
     <div className="result-card summary-card signal-card">
       <div className="result-card-header">
@@ -13,7 +18,16 @@ function SummaryCard({ title, content, onCopy, onRegenerate, copied, regeneratin
         </span>
         <h4>{title}</h4>
       </div>
-      <p className="signal-card-body">{content}</p>
+
+      {bullets.length > 1 ? (
+        <ul className="summary-bullet-list">
+          {bullets.map((line, index) => (
+            <li key={index}>{line.replace(/^[•\-*]\s*/, "")}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="signal-card-body">{content}</p>
+      )}
 
       {(onCopy || onRegenerate) && (
         <div className="reply-toolbar">
