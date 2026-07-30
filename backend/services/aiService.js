@@ -5,15 +5,41 @@
 const { getAIModel } = require("../config/ai");
 
 const SUMMARY_GENERATION_CONFIG = {
-  temperature: 0.1,
-  maxOutputTokens: 900,
+  temperature: 0.2,
+  maxOutputTokens: 1024,
 };
 
 const wait = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 /**
- * Builds a detailed but concise email-summary prompt.
+ * Strips a trailing bullet that was cut off mid-sentence (defensive
+ * safety net — the prompt already forbids this, but if a response is
+ * truncated for any reason we should never show the user a dangling
+ * half-sentence).
+ */
+const dropTrailingIncompleteBullet = (text) => {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length <= 1) {
+    return text;
+  }
+
+  const last = lines[lines.length - 1];
+  const endsCleanly = /[.!?"'”)]\s*$/.test(last);
+
+  if (!endsCleanly) {
+    return lines.slice(0, -1).join("\n");
+  }
+
+  return lines.join("\n");
+};
+
+/**
+ * Builds a professional, anti-hallucination email-summary prompt.
  */
 const buildSummaryPrompt = (subject, body) => {
   const cleanSubject =
@@ -27,7 +53,7 @@ const buildSummaryPrompt = (subject, body) => {
       : "No email content provided";
 
   return `
-Summarize the following email for the recipient.
+You are an executive assistant summarizing an email for a busy professional.
 
 SUBJECT:
 ${cleanSubject}
@@ -35,29 +61,37 @@ ${cleanSubject}
 EMAIL CONTENT:
 ${cleanBody}
 
-Write a genuinely useful summary, not a one-line recap.
+Read and understand the entire email before writing anything, then write a
+summary in your OWN WORDS. Do not copy or lightly reword sentences straight
+from the email — compress and restate the meaning as a skilled assistant
+would when briefing their manager.
 
-Normally produce 4 to 5 bullet points. For long or detail-heavy emails you
-may use up to 6-7. Only use fewer than 3 points if the email truly contains
-almost no useful information (e.g. a one-line notification).
+Produce 4 to 7 bullet points (use fewer only if the email is genuinely
+trivial, e.g. a one-line automated notification). Cover, whichever apply:
+- The purpose of the email.
+- Important information the recipient needs to know.
+- Any action required from the recipient.
+- Deadlines or important dates.
+- Meetings mentioned.
+- Attachments mentioned.
+- Important links mentioned.
+- A final concluding note (what happens next, or who to contact).
 
-Cover, when present in the email:
-- The main purpose of the email.
-- Important context or information the recipient needs.
-- Any action expected from the recipient.
-- Deadlines, dates, meetings, links, or attachments.
-- A final important note (e.g. what happens next, or who to contact).
-
-Rules:
-- Start each point with •
-- Each point must contain real, specific information from the email — no filler like "This email is about..." or restating the subject line.
-- Include relevant names, dates, deadlines and links exactly as given.
-- Ignore greetings, signatures, tracking links and legal footer text.
-- Ignore advertisements and unnecessary footer content.
-- Do not write a heading like "Summary:".
-- Do not write "Analyze the Email".
-- Do not write "Bullet 1", "Purpose" or repeat these instructions.
-- Do not invent information that is not in the email.
+STRICT FORMATTING RULES:
+- Start every line with •
+- Every single bullet MUST be a complete sentence with proper ending
+  punctuation. Never stop mid-sentence, mid-clause, or mid-word.
+- If you are running low on space, write FEWER complete bullets rather
+  than a long bullet that gets cut off.
+- Each bullet must add new, specific information — never restate the
+  subject line or a previous bullet in different words.
+- Preserve exact names, dates, deadlines, numbers and links from the email.
+- Ignore greetings, sign-offs, signatures, legal footers, tracking pixels,
+  and advertisements.
+- Do not write a heading such as "Summary:".
+- Do not write meta-commentary like "Analyze the Email", "Bullet 1", or
+  repeat any of these instructions.
+- Do not invent information that is not present in the email.
 `;
 };
 const ALLOWED_REPLY_TONES = [
@@ -67,19 +101,21 @@ const ALLOWED_REPLY_TONES = [
 ];
 const buildTaskPrompt = (body) => {
   return `
-You are an AI email task extraction assistant.
-
-Read the email below and extract only clear, actionable tasks.
+You are an AI assistant extracting actionable tasks from an email for a
+task-management tool. Read the entire email first, then extract only
+clear, real, actionable tasks — never invent one that isn't there.
 
 For each task, return:
-- title: a short action statement
-- deadline: the date or time mentioned in the email, or null
+- title: a short, complete action statement (e.g. "Submit the internship report")
+- assignee: the person responsible for the task if the email clearly states or implies it (e.g. "You", "Recruiter", a named person), otherwise null
+- deadline: the exact date/day/time phrase mentioned in the email (e.g. "Friday", "July 30", "5 PM tomorrow"), otherwise null
 - priority: High, Medium, or Low
+- link: a single relevant URL from the email directly related to this task (e.g. a form, submission portal, or meeting link), otherwise null
 
 Priority rules:
-- High: urgent, immediate, today, tomorrow, important, or strict deadline
-- Medium: task has a future deadline but is not urgent
-- Low: optional or no deadline
+- High: urgent, immediate, today, tomorrow, or a strict/near deadline
+- Medium: a real but non-urgent future deadline
+- Low: optional, informational, or no deadline
 
 Return ONLY valid JSON in this exact structure:
 
@@ -87,8 +123,10 @@ Return ONLY valid JSON in this exact structure:
   "tasks": [
     {
       "title": "Submit internship report",
+      "assignee": "You",
       "deadline": "Friday",
-      "priority": "High"
+      "priority": "High",
+      "link": "https://forms.google.com/xyz"
     }
   ]
 }
@@ -102,6 +140,7 @@ If there are no actionable tasks, return:
 Do not add markdown.
 Do not use code fences.
 Do not add explanations.
+Do not invent an assignee, deadline, or link that isn't in the email.
 
 Email:
 ${body}
@@ -145,7 +184,7 @@ const buildReplyPrompt = ({
       "Keep the reply brief, direct and complete.",
   };
 
-  return `Draft a natural email reply to the email below.
+  return `You are drafting a natural, human-sounding email reply on behalf of the recipient.
 
 Original email subject:
 ${cleanSubject}
@@ -158,13 +197,14 @@ ${cleanBody}
 
 Instructions:
 - ${toneInstructions[selectedTone]}
-- Respond directly to the actual email.
-- Preserve important details accurately.
-- Do not invent names, dates, times, promises or facts.
+- Read the entire original email and respond directly to what it actually says and asks.
+- Write in complete sentences. Never end the reply mid-sentence.
+- Preserve important details (names, dates, numbers) exactly as given.
+- Do not invent names, dates, times, promises, or facts not present in the original email or obviously implied by a direct reply.
 - If the sender asks for confirmation, provide a suitable confirmation without inventing unavailable information.
 - Do not include a subject line.
 - Do not include headings such as "Generated Reply" or "Reply".
-- Do not use markdown, bullet points or code blocks.
+- Do not use markdown, bullet points, or code blocks.
 - Do not add the recipient's name unless it is provided.
 - Return only the email reply body.`;
 };
@@ -214,24 +254,42 @@ const summarizeEmail = async (subject, body) => {
             parts: [{ text: prompt }],
           },
         ],
-        generationConfig: SUMMARY_GENERATION_CONFIG,
+        generationConfig: {
+          ...SUMMARY_GENERATION_CONFIG,
+          // Give truncated responses more room on each retry rather than
+          // repeating the same request and truncating again.
+          maxOutputTokens: SUMMARY_GENERATION_CONFIG.maxOutputTokens + (attempt - 1) * 400,
+        },
       });
       const response = await result.response;
-      const text = response.text()?.trim();
+      const rawText = response.text()?.trim();
 
       const finishReason = response?.candidates?.[0]?.finishReason;
 
       console.log("Gemini finish reason:", finishReason);
-      console.log("Generated summary:", text);
+      console.log("Generated summary:", rawText);
 
-      if (!text || text.length < 20) {
+      if (!rawText || rawText.length < 20) {
         const error = new Error(
-        "Gemini returned an incomplete summary. Please try again."
-      );
+          "Gemini returned an incomplete summary. Please try again."
+        );
 
-      error.status = 502;
-      throw error;
-    }
+        error.status = 502;
+        throw error;
+      }
+
+      if (finishReason === "MAX_TOKENS") {
+        // The model ran out of room mid-thought. Retrying with a bigger
+        // budget (see above) gives a real shot at a complete summary
+        // instead of silently handing back a truncated one.
+        const truncationError = new Error(
+          "Gemini truncated the summary before finishing."
+        );
+        truncationError.status = 503;
+        throw truncationError;
+      }
+
+      const text = dropTrailingIncompleteBullet(rawText);
 
       return text.trim();
     } catch (error) {
@@ -242,6 +300,15 @@ const summarizeEmail = async (subject, body) => {
       }
 
       if (attempt === maximumAttempts) {
+        // Even after retries we may only have a truncated draft. Prefer
+        // returning the cleaned-up (safety-net-trimmed) text over a hard
+        // failure, since a shorter-but-complete summary is still useful.
+        if (error.message?.includes("truncated")) {
+          throw new Error(
+            "Gemini couldn't finish a complete summary for this email. Please try again."
+          );
+        }
+
         const busyError = new Error(
           "Gemini is currently busy. Please wait a moment and try again."
         );
@@ -252,12 +319,12 @@ const summarizeEmail = async (subject, body) => {
 
       const delay = 2000 * attempt;
 
-   console.warn(
-  `Gemini is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
-);
+      console.warn(
+        `Gemini is temporarily unavailable. Retrying in ${delay / 1000} seconds...`
+      );
 
-await wait(delay);
-continue;
+      await wait(delay);
+      continue;
     }
   }
 
@@ -487,11 +554,19 @@ const extractEmailTasks = async (body) => {
         .filter((task) => task && typeof task.title === "string" && task.title.trim())
         .map((task) => ({
           title: task.title.trim(),
+          assignee:
+            typeof task.assignee === "string" && task.assignee.trim()
+              ? task.assignee.trim()
+              : null,
           deadline:
             typeof task.deadline === "string" && task.deadline.trim()
               ? task.deadline.trim()
               : null,
           priority: normalizePriority(task.priority),
+          link:
+            typeof task.link === "string" && /^https?:\/\//i.test(task.link.trim())
+              ? task.link.trim()
+              : null,
         }));
 
       return tasks;
