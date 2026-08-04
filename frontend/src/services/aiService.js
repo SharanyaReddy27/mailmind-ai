@@ -18,14 +18,16 @@ const buildPayload = (email) => ({
 
 const unwrapError = (error) => {
   const message =
-    error?.response?.data?.message || "Unable to process this email.";
+    error?.response?.data?.message ||
+    error?.message ||
+    "Unable to process this email.";
   throw new Error(message);
 };
 
 export const summarizeEmail = async (email) => {
   try {
     const { data } = await api.post("/ai/summarize", buildPayload(email));
-    return data.summary;
+    return data?.summary || data?.reply || data?.tasks || "";
   } catch (error) {
     unwrapError(error);
   }
@@ -43,7 +45,7 @@ export const generateReply = async (email, tone = "professional") => {
     };
 
     const { data } = await api.post("/ai/reply", payload);
-    return data.reply;
+    return data?.reply || "";
   } catch (error) {
     unwrapError(error);
   }
@@ -52,7 +54,7 @@ export const generateReply = async (email, tone = "professional") => {
 export const extractTasks = async (email) => {
   try {
     const { data } = await api.post("/ai/tasks", buildPayload(email));
-    return Array.isArray(data.tasks) ? data.tasks : [];
+    return Array.isArray(data?.tasks) ? data.tasks : [];
   } catch (error) {
     unwrapError(error);
   }

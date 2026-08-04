@@ -12,6 +12,8 @@ function Settings() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorStatus, setErrorStatus] = useState(null);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const navigate = useNavigate();
@@ -80,7 +82,10 @@ function Settings() {
       // refresh status
       loadStatus();
     } catch (err) {
-      setError(err.message || 'Sync failed');
+      const message = err?.message || 'Sync failed';
+      setError(message);
+      setErrorStatus(err?.status || null);
+      setNeedsReconnect(err?.status === 401 || message.toLowerCase().includes('reconnect'));
     } finally {
       setSyncing(false);
     }
@@ -137,6 +142,12 @@ function Settings() {
               <p className="integration-detail">Connected at: {status.connectedAt || '—'}</p>
               <p className="integration-detail">Last synced: {status.lastSyncedAt || '—'}</p>
 
+              {(status.hasRefreshToken === false || needsReconnect) && (
+                <p className="integration-detail warning">
+                  Gmail credentials are incomplete or have expired. Reconnect Gmail to restore sync.
+                </p>
+              )}
+
               <div className="integration-actions">
                 <button type="button" disabled={syncing} onClick={handleSync} className="primary">
                   <RefreshCw size={14} strokeWidth={2.25} />
@@ -144,6 +155,11 @@ function Settings() {
                 </button>
                 <button type="button" onClick={() => navigate('/inbox')}>Open Inbox</button>
                 <button type="button" onClick={handleDisconnect} className="danger">Disconnect Gmail</button>
+                {(status.hasRefreshToken === false || needsReconnect) && (
+                  <button type="button" onClick={handleConnect} className="primary">
+                    Reconnect Gmail
+                  </button>
+                )}
               </div>
             </div>
           ) : (

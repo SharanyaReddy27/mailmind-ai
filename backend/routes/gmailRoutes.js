@@ -14,8 +14,15 @@ router.post('/sync', protect, async (req, res) => {
     const result = await gmailService.syncGmailForUser(req.user, limit);
     res.json({ success: true, ...result });
   } catch (err) {
-    if (err && err.code === 'NO_CONNECTION') return res.status(409).json({ success: false, message: 'Gmail not connected' });
-    return res.status(500).json({ success: false, message: 'Sync failed' });
+    console.error('======== SYNC ERROR ========', err);
+    if (err && err.code === 'NO_CONNECTION') {
+      return res.status(409).json({ success: false, message: 'Gmail not connected' });
+    }
+    if (err && err.code === 'INVALID_GMAIL_TOKEN') {
+      return res.status(401).json({ success: false, message: err.message });
+    }
+    const message = err?.message || 'Sync failed';
+    return res.status(500).json({ success: false, message });
   }
 });
 

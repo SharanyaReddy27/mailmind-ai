@@ -32,20 +32,25 @@ const persistAiResult = async (req, emailId, update) => {
 };
 
 const sendControllerError = (res, error, fallbackMessage) => {
-  const statusCode =
-    error.statusCode || error.status || 500;
+  const statusCode = error.statusCode || error.status || 500;
+  const message = error.message || fallbackMessage;
+
+  console.error("[controller error]", {
+    fallbackMessage,
+    statusCode,
+    message,
+  });
 
   return res.status(statusCode).json({
     success: false,
-    message:
-      statusCode === 500
-        ? fallbackMessage
-        : error.message,
+    message,
   });
 };
 
 const summarizeEmail = async (req, res) => {
   try {
+    console.log("======== SUMMARY REQUEST ========");
+    console.log("[controller] summarize payload", req.body);
     const { subject = "", body, emailId } = req.body || {};
 
     const cleanSubject =
@@ -65,16 +70,19 @@ const summarizeEmail = async (req, res) => {
       });
     }
 
+    console.log("======== CONTROLLER ========");
     const summary = await generateAISummary(
       cleanSubject,
       cleanBody
     );
 
+    console.log("======== DATABASE SAVE ========");
     await persistAiResult(req, emailId, {
       aiSummary: summary,
       aiSummaryAt: new Date(),
     });
 
+    console.log("======== RESPONSE SENT ========");
     return res.status(200).json({
       success: true,
       summary,
@@ -95,6 +103,8 @@ const summarizeEmail = async (req, res) => {
 
 const generateReply = async (req, res) => {
   try {
+    console.log("======== REPLY REQUEST ========");
+    console.log("[controller] reply payload", req.body);
     const {
       subject = "",
       body,
@@ -125,6 +135,7 @@ const generateReply = async (req, res) => {
       });
     }
 
+    console.log("======== CONTROLLER ========");
     const reply = await generateEmailReply({
       subject,
       body,
@@ -132,12 +143,14 @@ const generateReply = async (req, res) => {
       tone: normalizedTone,
     });
 
+    console.log("======== DATABASE SAVE ========");
     await persistAiResult(req, emailId, {
       aiReply: reply,
       aiReplyTone: normalizedTone,
       aiReplyAt: new Date(),
     });
 
+    console.log("======== RESPONSE SENT ========");
     return res.status(200).json({
       success: true,
       reply,
@@ -158,6 +171,8 @@ const generateReply = async (req, res) => {
 
 const extractTasks = async (req, res) => {
   try {
+    console.log("======== TASKS REQUEST ========");
+    console.log("[controller] tasks payload", req.body);
     const { body, emailId } = req.body || {};
 
     if (typeof body !== "string" || !body.trim()) {
@@ -167,13 +182,16 @@ const extractTasks = async (req, res) => {
       });
     }
 
+    console.log("======== CONTROLLER ========");
     const tasks = await extractEmailTasks(body);
 
+    console.log("======== DATABASE SAVE ========");
     await persistAiResult(req, emailId, {
       aiTasks: tasks,
       aiTasksAt: new Date(),
     });
 
+    console.log("======== RESPONSE SENT ========");
     return res.status(200).json({
       success: true,
       tasks,

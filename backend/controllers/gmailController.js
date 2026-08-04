@@ -119,6 +119,7 @@ const status = async (req, res) => {
       googleEmail: conn.googleEmail,
       connectedAt: conn.connectedAt,
       lastSyncedAt: conn.lastSyncedAt,
+      hasRefreshToken: Boolean(conn.refreshToken),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Unable to fetch status' });

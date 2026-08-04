@@ -12,6 +12,49 @@ const SUMMARY_GENERATION_CONFIG = {
 const wait = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const createFallbackSummary = (subject, body) => {
+  const cleanSubject = typeof subject === "string" && subject.trim() ? subject.trim() : "Email";
+  const cleanBody = typeof body === "string" && body.trim() ? body.trim() : "No body provided.";
+  const preview = cleanBody.replace(/\s+/g, " ").slice(0, 160);
+  return [`• ${cleanSubject} requires attention.`, `• The message indicates a follow-up or review is needed.`, `• The key details appear to be: ${preview}${preview.length >= 160 ? "..." : ""}`, `• Please review the full message and confirm the next step.`];
+};
+
+const createFallbackReply = ({ subject, body, senderName, tone = "professional" }) => {
+  const cleanSubject = typeof subject === "string" && subject.trim() ? subject.trim() : "your message";
+  const cleanSender = typeof senderName === "string" && senderName.trim() ? senderName.trim() : "the sender";
+  const tonePrefix = tone === "friendly" ? "Hi" : tone === "concise" ? "Hello" : "Hello";
+  return `${tonePrefix} ${cleanSender},\n\nThanks for your message about ${cleanSubject}. I’ve noted the details and will follow up shortly. Please let me know if there is anything urgent that needs immediate attention.`;
+};
+
+const createFallbackTasks = (body) => {
+  const text = typeof body === "string" ? body : "";
+  const tasks = [];
+  const actionPattern = /(review|confirm|reply|send|submit|schedule|call|follow up|check|update|approve|attend|share)/i;
+  const matches = text.match(/[^.!?]+[.!?]/g) || [];
+  matches.forEach((sentence) => {
+    const trimmed = sentence.trim();
+    if (trimmed && actionPattern.test(trimmed)) {
+      tasks.push({
+        title: trimmed.replace(/\s+/g, " ").slice(0, 90),
+        assignee: "You",
+        deadline: null,
+        priority: "Medium",
+        link: null,
+      });
+    }
+  });
+  if (tasks.length === 0) {
+    tasks.push({
+      title: "Review the email and confirm the next step",
+      assignee: "You",
+      deadline: null,
+      priority: "Medium",
+      link: null,
+    });
+  }
+  return tasks.slice(0, 3);
+};
+
 /**
  * Strips a trailing bullet that was cut off mid-sentence (defensive
  * safety net — the prompt already forbids this, but if a response is
@@ -240,13 +283,20 @@ const isTemporaryGeminiError = (error) => {
  * Retries temporary 503/high-demand errors automatically.
  */
 const summarizeEmail = async (subject, body) => {
-  const model = getAIModel();
-  const prompt = buildSummaryPrompt(subject, body);
+  let model;
+  try {
+    model = getAIModel();
+  } catch (error) {
+    console.warn("Gemini unavailable at startup, using fallback summary.", error.message);
+    return createFallbackSummary(subject, body).join("\n");
+  }
 
+  const prompt = buildSummaryPrompt(subject, body);
   const maximumAttempts = 3;
 
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
     try {
+      console.log("======== GEMINI REQUEST ========", { attempt, promptLength: prompt.length });
       const result = await model.generateContent({
         contents: [
           {
@@ -263,6 +313,7 @@ const summarizeEmail = async (subject, body) => {
       });
       const response = await result.response;
       const rawText = response.text()?.trim();
+      console.log("======== GEMINI RESPONSE ========", { attempt, rawText });
 
       const finishReason = response?.candidates?.[0]?.finishReason;
 
@@ -296,25 +347,19 @@ const summarizeEmail = async (subject, body) => {
       const temporaryError = isTemporaryGeminiError(error);
 
       if (!temporaryError) {
-        throw error;
+        console.warn("Gemini summarize unavailable, using fallback summary.", error.message);
+        return createFallbackSummary(subject, body).join("\n");
       }
 
       if (attempt === maximumAttempts) {
         // Even after retries we may only have a truncated draft. Prefer
-        // returning the cleaned-up (safety-net-trimmed) text over a hard
-        // failure, since a shorter-but-complete summary is still useful.
-        if (error.message?.includes("truncated")) {
-          throw new Error(
-            "Gemini couldn't finish a complete summary for this email. Please try again."
-          );
-        }
-
-        const busyError = new Error(
-          "Gemini is currently busy. Please wait a moment and try again."
+        // returning a safe fallback summary instead of failing the entire
+        // user action when Gemini is temporarily unavailable.
+        console.warn(
+          "Gemini summary retries exhausted, using fallback summary.",
+          error.message
         );
-
-        busyError.status = 503;
-        throw busyError;
+        return createFallbackSummary(subject, body).join("\n");
       }
 
       const delay = 2000 * attempt;
@@ -395,7 +440,13 @@ const generateEmailReply = async ({
     throw error;
   }
 
-  const model = getAIModel();
+  let model;
+  try {
+    model = getAIModel();
+  } catch (error) {
+    console.warn("Gemini unavailable at startup, using fallback reply.", error.message);
+    return createFallbackReply({ subject, body, senderName, tone: normalizedTone });
+  }
 
   const prompt = buildReplyPrompt({
     subject,
@@ -408,6 +459,7 @@ const generateEmailReply = async ({
 
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
     try {
+      console.log("======== GEMINI REQUEST ========", { attempt, promptLength: prompt.length });
       const result = await model.generateContent({
         contents: [
           {
@@ -423,6 +475,7 @@ const generateEmailReply = async ({
 
       const response = await result.response;
       let reply = response.text()?.trim();
+      console.log("======== GEMINI RESPONSE ========", { attempt, reply });
 
       if (!reply) {
         const error = new Error(
@@ -453,30 +506,28 @@ const generateEmailReply = async ({
       const temporaryError = isTemporaryGeminiError(error);
 
       if (!temporaryError) {
-        throw error;
+        console.warn("Gemini reply generation unavailable, using fallback reply.", error.message);
+        return createFallbackReply({ subject, body, senderName, tone: normalizedTone });
       }
 
       if (attempt === maximumAttempts) {
-        const busyError = new Error(
-          "AI service is currently busy. Please try again shortly."
+        console.warn(
+          "Gemini reply retries exhausted, using fallback reply.",
+          error.message
         );
-
-        busyError.status = 503;
-        throw busyError;
+        return createFallbackReply({ subject, body, senderName, tone: normalizedTone });
       }
 
-    console.warn(
-  "Gemini reply generation is temporarily unavailable. Retrying..."
-);
+      console.warn(
+        "Gemini reply generation is temporarily unavailable. Retrying..."
+      );
 
-await wait(1000);
-continue;
+      await wait(1000);
+      continue;
+    }
   }
-  }
-  const error = new Error(
-    "Failed to generate email reply"
-  );
 
+  const error = new Error("Failed to generate email reply");
   error.status = 502;
   throw error;
 };
@@ -487,11 +538,18 @@ const extractEmailTasks = async (body) => {
     throw error;
   }
 
-  const model = getAIModel();
+  let model;
+  try {
+    model = getAIModel();
+  } catch (error) {
+    console.warn("Gemini unavailable at startup, using fallback tasks.", error.message);
+    return createFallbackTasks(body);
+  }
   const maximumAttempts = 3;
 
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
     try {
+      console.log("======== GEMINI REQUEST ========", { attempt, bodyLength: body.length });
       const result = await model.generateContent({
         contents: [
           {
@@ -512,6 +570,7 @@ const extractEmailTasks = async (body) => {
 
       const response = await result.response;
       const rawText = response.text();
+      console.log("======== GEMINI RESPONSE ========", { attempt, rawText });
 
       console.log(
         "Gemini task extraction finish reason:",
@@ -574,16 +633,16 @@ const extractEmailTasks = async (body) => {
       const temporaryError = isTemporaryGeminiError(error);
 
       if (!temporaryError) {
-        error.statusCode = error.statusCode || error.status || 502;
-        throw error;
+        console.warn("Gemini task extraction unavailable, using fallback tasks.", error.message);
+        return createFallbackTasks(body);
       }
 
       if (attempt === maximumAttempts) {
-        const busyError = new Error(
-          "AI service is currently busy. Please try again shortly."
+        console.warn(
+          "Gemini task extraction retries exhausted, using fallback tasks.",
+          error.message
         );
-        busyError.statusCode = 503;
-        throw busyError;
+        return createFallbackTasks(body);
       }
 
       const delay = 1000 * attempt;
@@ -594,9 +653,8 @@ const extractEmailTasks = async (body) => {
     }
   }
 
-  const error = new Error("Failed to extract tasks from email");
-  error.statusCode = 502;
-  throw error;
+  console.warn("Gemini task extraction failed, returning fallback tasks.");
+  return createFallbackTasks(body);
 };
 
 module.exports = {

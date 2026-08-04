@@ -57,11 +57,45 @@ function extractBody(payload) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+const isInvalidGrantError = (error) => {
+  const message = String(
+    error?.message ||
+    error?.errors?.[0]?.message ||
+    error?.response?.data?.error_description ||
+    error?.response?.data?.error ||
+    ''
+  ).toLowerCase();
+
+  return (
+    message.includes('invalid_grant') ||
+    message.includes('invalid grant') ||
+    message.includes('invalid refresh token') ||
+    message.includes('expired credentials') ||
+    message.includes('unauthorized')
+  );
+};
+
+const createInvalidGmailTokenError = () => {
+  const error = new Error(
+    'Gmail credentials are no longer valid. Please reconnect Gmail to restore sync.'
+  );
+  error.code = 'INVALID_GMAIL_TOKEN';
+  error.status = 401;
+  return error;
+};
+
 async function syncGmailForUser(user, limit = 20) {
+  console.log('======== SYNC REQUEST ========', { userId: user?._id?.toString(), limit });
   const conn = await GmailConnection.findOne({ userId: user._id });
   if (!conn) {
     const e = new Error('No connection');
     e.code = 'NO_CONNECTION';
+    throw e;
+  }
+
+  if (!conn.refreshToken) {
+    const e = new Error('No Gmail refresh token available. Reconnect Gmail.');
+    e.code = 'INVALID_GMAIL_TOKEN';
     throw e;
   }
 
@@ -73,20 +107,30 @@ async function syncGmailForUser(user, limit = 20) {
 
   const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-  // ensure token is refreshed if needed
   try {
     const tokens = await oAuth2Client.getAccessToken();
     if (tokens && tokens.token) {
       conn.accessToken = tokens.token;
-      // expiry not provided reliably here
+      conn.tokenExpiry = tokens.res ? tokens.res.data.expiry_date : conn.tokenExpiry;
       await conn.save();
     }
   } catch (e) {
-    // ignore refresh errors here; will surface on message fetch
+    console.warn('Token refresh warning:', e.message);
+    if (isInvalidGrantError(e)) {
+      throw createInvalidGmailTokenError();
+    }
   }
 
-  // list messages
-  const listRes = await gmail.users.messages.list({ userId: 'me', maxResults: limit });
+  let listRes;
+  try {
+    listRes = await gmail.users.messages.list({ userId: 'me', maxResults: limit });
+  } catch (err) {
+    console.error('Gmail list messages failed:', err.message);
+    if (isInvalidGrantError(err)) {
+      throw createInvalidGmailTokenError();
+    }
+    throw new Error(err.message || 'Unable to fetch Gmail messages');
+  }
   const messages = (listRes && listRes.data && listRes.data.messages) || [];
   let created = 0, skipped = 0, failed = 0;
 
@@ -131,18 +175,20 @@ async function syncGmailForUser(user, limit = 20) {
         await Email.create(emailDoc);
         created++;
       } catch (err) {
-        // duplicate key or other
         skipped++;
+        console.warn('Skipping duplicate or invalid Gmail message:', err.message);
         continue;
       }
     } catch (err) {
       failed++;
+      console.warn('Failed to process Gmail message:', err.message);
       continue;
     }
   }
 
   conn.lastSyncedAt = new Date();
   await conn.save();
+  console.log('======== SYNC RESPONSE ========', { fetched: messages.length, created, skipped, failed });
 
   return { message: 'Gmail synchronization completed', fetched: messages.length, created, skipped, failed, lastSyncedAt: conn.lastSyncedAt };
 }

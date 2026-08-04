@@ -91,6 +91,9 @@ function EmailDetails() {
       return;
     }
 
+    console.log("======== SUMMARY CLICK ========", { action, emailId: email?._id || email?.id });
+    console.log("======== REQUEST START ========", { action, bodyLength: body.length });
+
     setError("");
     setActiveAction(action);
     setCopied(false);
@@ -98,45 +101,48 @@ function EmailDetails() {
     try {
       if (action === "summarize") {
         const result = await summarizeEmail(email);
+        console.log("======== RESPONSE RECEIVED ========", { action, result });
         setSummary(result || "No summary returned.");
         setGeneratedReply("");
         setTasks(null);
+        setActiveTab("summary");
       } else if (action === "reply") {
         const result = await generateReply(email, toneOverride || tone);
+        console.log("======== RESPONSE RECEIVED ========", { action, result });
         setGeneratedReply(result || "No reply returned.");
         setSummary("");
         setTasks(null);
+        setActiveTab("reply");
       } else if (action === "tasks") {
         const result = await extractTasks(email);
+        console.log("======== RESPONSE RECEIVED ========", { action, result });
         setTasks(result || []);
         setSummary("");
         setGeneratedReply("");
+        setActiveTab("tasks");
       }
-  } catch (requestError) {
- if (action === "reply") {
-  setSummary("");
-  setTasks(null);
-  setGeneratedReply("");
 
-  setError(
-    "We couldn't generate a reply right now. Please try again."
-  );
-}
-else if (action === "tasks") {
-    setError("Couldn't extract tasks. Please try again.");
-}
- else {
-    setError(
-      requestError.message ||
-        "AI request failed. Make sure the backend is running."
-    );
+      console.log("======== STATE UPDATED ========", { action });
+    } catch (requestError) {
+      const message = requestError?.message || "AI request failed";
+      console.error("======== ERROR ========", { action, message });
 
-    setSummary("");
-    setGeneratedReply("");
-    setTasks([]);
-  }
-  
-} finally {
+      if (action === "reply") {
+        setSummary("");
+        setTasks(null);
+        setGeneratedReply("");
+      } else if (action === "tasks") {
+        setSummary("");
+        setGeneratedReply("");
+        setTasks([]);
+      } else {
+        setSummary("");
+        setGeneratedReply("");
+        setTasks([]);
+      }
+
+      setError(message);
+    } finally {
       setActiveAction("");
     }
   };

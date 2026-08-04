@@ -79,13 +79,21 @@ export const getCurrentUser = async () => {
 
 export default api;
 
+const buildApiError = (err, fallbackMessage) => {
+  const message = err?.response?.data?.message || fallbackMessage;
+  const error = new Error(message);
+  if (err?.response?.status) {
+    error.status = err.response.status;
+  }
+  return error;
+};
+
 export const getGmailAuthUrl = async () => {
   try {
     const res = await api.get('/gmail/auth-url');
     return res.data;
   } catch (err) {
-    const message = err?.response?.data?.message || 'Unable to get Gmail auth URL';
-    throw new Error(message);
+    throw buildApiError(err, 'Unable to get Gmail auth URL');
   }
 };
 
@@ -94,8 +102,7 @@ export const getGmailStatus = async () => {
     const res = await api.get('/gmail/status');
     return res.data;
   } catch (err) {
-    const message = err?.response?.data?.message || 'Unable to get Gmail status';
-    throw new Error(message);
+    throw buildApiError(err, 'Unable to get Gmail status');
   }
 };
 
@@ -104,8 +111,7 @@ export const syncGmail = async (limit = 20) => {
     const res = await api.post('/gmail/sync', { limit });
     return res.data;
   } catch (err) {
-    const message = err?.response?.data?.message || 'Unable to sync Gmail';
-    throw new Error(message);
+    throw buildApiError(err, 'Unable to sync Gmail');
   }
 };
 
@@ -114,7 +120,6 @@ export const disconnectGmail = async () => {
     const res = await api.post('/gmail/disconnect');
     return res.data;
   } catch (err) {
-    const message = err?.response?.data?.message || 'Unable to disconnect Gmail';
-    throw new Error(message);
+    throw buildApiError(err, 'Unable to disconnect Gmail');
   }
 };
