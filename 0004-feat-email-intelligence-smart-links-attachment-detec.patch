@@ -1,0 +1,628 @@
+From a74ddb60c1679ac35ced98f45ad41f6385d77910 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 30 Jul 2026 11:09:49 +0000
+Subject: [PATCH 4/6] feat(email-intelligence): smart links, attachment
+ detection, insights panel
+
+All client-side heuristics over data already returned by the existing
+/emails/:id endpoint - no new API routes, no new Gemini calls, no API
+contract changes.
+
+- detectLinks(): finds URLs and categorizes known providers (Zoom,
+  Google Meet, Microsoft Teams, Google Forms, Docs, Drive, GitHub,
+  Notion, Figma, Jira, Trello, LeetCode, Codeforces) into a provider +
+  action label; unknown URLs still come back with a generic 'Open Link'
+  label rather than being dropped.
+- detectAttachments(): finds filename-like mentions (Assignment.pdf,
+  Report.docx, Poster.png, etc.) and pairs them with a URL only if one
+  actually appears on the same line - never fabricates a download link
+  that doesn't exist. Unlinked mentions show 'Mentioned in email'
+  instead of a broken button.
+- detectDeadlines(): resolves 'today', 'tomorrow', weekday names (with
+  optional 'next'), 'next week', and month-day dates (full or
+  abbreviated, e.g. 'Aug 5') to real dates relative to the email's
+  receivedAt; bare time mentions ('before 5 PM') are kept as unresolved
+  time constraints rather than guessed at.
+- computeInsights(): reading time, urgency (keyword + existing priority
+  field), requires-reply, and boolean flags for deadline/attachment/
+  meeting/payment/form/external-link/contact-info - all derived, none
+  invented.
+
+New components render these on the email details page: SmartLinks
+(branded action buttons), AttachmentList (icon + Download/Preview or
+'Mentioned in email'), EmailInsights (reading time, urgency, requires-
+reply, insight chips, detected deadlines). Each renders nothing when
+there's nothing to show, so empty emails don't get empty boxes.
+
+Fixed during testing: the initial attachment filename regex allowed
+spaces/dots in the base name and would swallow multiple real filenames
+plus the prose between them into one bogus match - tightened to not
+cross word/space boundaries; verified against a multi-attachment,
+multi-link sample email.
+---
+ frontend/src/components/AttachmentList.jsx |  84 ++++++
+ frontend/src/components/EmailInsights.jsx  |  96 +++++++
+ frontend/src/components/SmartLinks.jsx     |  69 +++++
+ frontend/src/utils/emailIntelligence.js    | 300 +++++++++++++++++++++
+ 4 files changed, 549 insertions(+)
+ create mode 100644 frontend/src/components/AttachmentList.jsx
+ create mode 100644 frontend/src/components/EmailInsights.jsx
+ create mode 100644 frontend/src/components/SmartLinks.jsx
+ create mode 100644 frontend/src/utils/emailIntelligence.js
+
+diff --git a/frontend/src/components/AttachmentList.jsx b/frontend/src/components/AttachmentList.jsx
+new file mode 100644
+index 0000000..a497835
+--- /dev/null
++++ b/frontend/src/components/AttachmentList.jsx
+@@ -0,0 +1,84 @@
++import { Download, Eye, File, FileArchive, FileSpreadsheet, FileText, Film, Image, Paperclip } from "lucide-react";
++
++const ICONS = {
++  pdf: FileText,
++  doc: FileText,
++  ppt: FileText,
++  sheet: FileSpreadsheet,
++  archive: FileArchive,
++  image: Image,
++  video: Film,
++  file: File,
++};
++
++const EMOJI = {
++  pdf: "📄",
++  doc: "📝",
++  ppt: "📊",
++  sheet: "📈",
++  archive: "📦",
++  image: "🖼",
++  video: "🎬",
++  file: "📎",
++};
++
++function AttachmentList({ attachments }) {
++  if (!attachments || attachments.length === 0) {
++    return null;
++  }
++
++  return (
++    <div className="result-card attachment-card signal-card">
++      <div className="result-card-header">
++        <span className="result-icon">
++          <Paperclip size={14} strokeWidth={2.25} />
++        </span>
++        <h4>Attachments Mentioned</h4>
++      </div>
++
++      <div className="attachment-list">
++        {attachments.map((attachment) => {
++          const Icon = ICONS[attachment.kind] || File;
++
++          return (
++            <div className="attachment-row" key={attachment.name}>
++              <span className="attachment-emoji" aria-hidden="true">
++                {EMOJI[attachment.kind] || "📎"}
++              </span>
++
++              <span className="attachment-name">
++                <Icon size={13} strokeWidth={2.25} />
++                {attachment.name}
++              </span>
++
++              {attachment.url ? (
++                <a
++                  href={attachment.url}
++                  target="_blank"
++                  rel="noopener noreferrer"
++                  className="attachment-action"
++                >
++                  {attachment.kind === "image" ? (
++                    <>
++                      <Eye size={13} strokeWidth={2.25} />
++                      Preview
++                    </>
++                  ) : (
++                    <>
++                      <Download size={13} strokeWidth={2.25} />
++                      Download
++                    </>
++                  )}
++                </a>
++              ) : (
++                <span className="attachment-mentioned-only">Mentioned in email</span>
++              )}
++            </div>
++          );
++        })}
++      </div>
++    </div>
++  );
++}
++
++export default AttachmentList;
+diff --git a/frontend/src/components/EmailInsights.jsx b/frontend/src/components/EmailInsights.jsx
+new file mode 100644
+index 0000000..ffe6791
+--- /dev/null
++++ b/frontend/src/components/EmailInsights.jsx
+@@ -0,0 +1,96 @@
++import {
++  AlertTriangle,
++  CalendarClock,
++  Clock,
++  CreditCard,
++  FileText,
++  Link2,
++  MessageSquareWarning,
++  Paperclip,
++  Phone,
++  Video,
++} from "lucide-react";
++
++function InsightChip({ icon: Icon, label, active }) {
++  return (
++    <span className={`insight-chip ${active ? "insight-chip--active" : "insight-chip--inactive"}`}>
++      <Icon size={13} strokeWidth={2.25} />
++      {label}
++      <span className="insight-chip-value">{active ? "Yes" : "No"}</span>
++    </span>
++  );
++}
++
++function EmailInsights({ insights, deadlines }) {
++  if (!insights) {
++    return null;
++  }
++
++  const urgencyTone =
++    insights.urgency === "High" ? "high" : insights.urgency === "Medium" ? "medium" : "low";
++
++  return (
++    <div className="result-card insights-card signal-card">
++      <div className="result-card-header">
++        <span className="result-icon">
++          <Clock size={14} strokeWidth={2.25} />
++        </span>
++        <h4>Email Insights</h4>
++      </div>
++
++      <div className="insight-headline-row">
++        <div className="insight-headline">
++          <span className="insight-headline-label">Reading time</span>
++          <span className="insight-headline-value">
++            {insights.readingTimeMinutes} min{insights.readingTimeMinutes === 1 ? "" : "s"}
++          </span>
++        </div>
++
++        <div className="insight-headline">
++          <span className="insight-headline-label">Urgency</span>
++          <span className={`insight-urgency insight-urgency--${urgencyTone}`}>
++            {insights.urgency}
++          </span>
++        </div>
++
++        <div className="insight-headline">
++          <span className="insight-headline-label">Requires reply</span>
++          <span className="insight-headline-value">
++            {insights.requiresReply ? "Yes" : "No"}
++          </span>
++        </div>
++      </div>
++
++      <div className="insight-chip-grid">
++        <InsightChip icon={CalendarClock} label="Deadline" active={insights.containsDeadline} />
++        <InsightChip icon={Paperclip} label="Attachment" active={insights.containsAttachment} />
++        <InsightChip icon={Video} label="Meeting" active={insights.containsMeeting} />
++        <InsightChip icon={CreditCard} label="Payment" active={insights.containsPayment} />
++        <InsightChip icon={FileText} label="Form" active={insights.containsForm} />
++        <InsightChip icon={Link2} label="External link" active={insights.containsExternalLink} />
++        <InsightChip icon={Phone} label="Contact info" active={insights.containsContactInfo} />
++      </div>
++
++      {deadlines && deadlines.length > 0 && (
++        <div className="insight-deadlines">
++          <span className="insight-deadlines-title">
++            <AlertTriangle size={12} strokeWidth={2.25} />
++            Detected deadlines
++          </span>
++          <ul>
++            {deadlines.map((deadline, index) => (
++              <li key={`${deadline.raw}-${index}`}>
++                <MessageSquareWarning size={12} strokeWidth={2.25} />
++                <span>
++                  <strong>{deadline.raw}</strong> → {deadline.label}
++                </span>
++              </li>
++            ))}
++          </ul>
++        </div>
++      )}
++    </div>
++  );
++}
++
++export default EmailInsights;
+diff --git a/frontend/src/components/SmartLinks.jsx b/frontend/src/components/SmartLinks.jsx
+new file mode 100644
+index 0000000..87cfcf6
+--- /dev/null
++++ b/frontend/src/components/SmartLinks.jsx
+@@ -0,0 +1,69 @@
++import {
++  BookOpen,
++  ClipboardList,
++  Code2,
++  FileText,
++  GitBranch,
++  HardDrive,
++  Kanban,
++  Link2,
++  PenTool,
++  Video,
++} from "lucide-react";
++
++const ICONS = {
++  meeting: Video,
++  form: ClipboardList,
++  doc: FileText,
++  drive: HardDrive,
++  github: GitBranch,
++  notion: BookOpen,
++  figma: PenTool,
++  jira: Kanban,
++  trello: Kanban,
++  code: Code2,
++  generic: Link2,
++};
++
++function SmartLinks({ links }) {
++  if (!links || links.length === 0) {
++    return null;
++  }
++
++  return (
++    <div className="result-card smart-links-card signal-card">
++      <div className="result-card-header">
++        <span className="result-icon">
++          <Link2 size={14} strokeWidth={2.25} />
++        </span>
++        <h4>Detected Links</h4>
++      </div>
++
++      <div className="smart-links-grid">
++        {links.map((link) => {
++          const Icon = ICONS[link.kind] || Link2;
++
++          return (
++            <a
++              key={link.url}
++              href={link.url}
++              target="_blank"
++              rel="noopener noreferrer"
++              className="smart-link-button"
++            >
++              <span className="smart-link-icon">
++                <Icon size={15} strokeWidth={2.25} />
++              </span>
++              <span className="smart-link-text">
++                <span className="smart-link-label">{link.label}</span>
++                <span className="smart-link-provider">{link.provider}</span>
++              </span>
++            </a>
++          );
++        })}
++      </div>
++    </div>
++  );
++}
++
++export default SmartLinks;
+diff --git a/frontend/src/utils/emailIntelligence.js b/frontend/src/utils/emailIntelligence.js
+new file mode 100644
+index 0000000..6245a65
+--- /dev/null
++++ b/frontend/src/utils/emailIntelligence.js
+@@ -0,0 +1,300 @@
++// Client-side email intelligence helpers.
++//
++// These are deliberately NOT Gemini calls: detecting a Zoom link, a PDF
++// filename, or the word "urgent" doesn't need an LLM, and keeping this
++// logic client-side means zero new API surface and zero new backend load.
++// Everything here is a heuristic over text that's already in the email
++// object the app already fetched - nothing here is fabricated or invented.
++
++const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
++
++const PROVIDER_RULES = [
++  { test: (u) => /zoom\.us/i.test(u), provider: "Zoom", label: "Join Meeting", kind: "meeting" },
++  { test: (u) => /meet\.google\.com/i.test(u), provider: "Google Meet", label: "Join Meeting", kind: "meeting" },
++  { test: (u) => /teams\.(microsoft|live)\.com/i.test(u), provider: "Microsoft Teams", label: "Join Meeting", kind: "meeting" },
++  { test: (u) => /forms\.google\.com|forms\.gle|docs\.google\.com\/forms/i.test(u), provider: "Google Form", label: "Complete Form", kind: "form" },
++  { test: (u) => /docs\.google\.com|sheets\.google\.com|slides\.google\.com/i.test(u), provider: "Google Docs", label: "View Document", kind: "doc" },
++  { test: (u) => /drive\.google\.com/i.test(u), provider: "Google Drive", label: "Open Drive Folder", kind: "drive" },
++  { test: (u) => /github\.com/i.test(u), provider: "GitHub", label: "Open GitHub", kind: "github" },
++  { test: (u) => /notion\.(so|site)/i.test(u), provider: "Notion", label: "Open Notion", kind: "notion" },
++  { test: (u) => /figma\.com/i.test(u), provider: "Figma", label: "Open Figma", kind: "figma" },
++  { test: (u) => /atlassian\.net|jira/i.test(u), provider: "Jira", label: "Open Jira", kind: "jira" },
++  { test: (u) => /trello\.com/i.test(u), provider: "Trello", label: "Open Trello", kind: "trello" },
++  { test: (u) => /leetcode\.com/i.test(u), provider: "LeetCode", label: "Open LeetCode", kind: "code" },
++  { test: (u) => /codeforces\.com/i.test(u), provider: "Codeforces", label: "Open Codeforces", kind: "code" },
++];
++
++function stripTrailingPunctuation(url) {
++  return url.replace(/[.,;:!?)"'\]]+$/, "");
++}
++
++/**
++ * Finds URLs in the given text and categorizes them into known providers
++ * (meeting apps, forms, docs, code hosts, etc.) so they can be rendered as
++ * labeled action buttons instead of raw hyperlinks. Unrecognized URLs still
++ * come back with a generic "Open Link" label - nothing is dropped.
++ */
++export function detectLinks(text) {
++  if (!text) return [];
++
++  const matches = text.match(URL_REGEX) || [];
++  const seen = new Set();
++  const links = [];
++
++  for (const raw of matches) {
++    const url = stripTrailingPunctuation(raw);
++    if (seen.has(url)) continue;
++    seen.add(url);
++
++    const rule = PROVIDER_RULES.find((r) => r.test(url));
++    let hostname = "";
++    try {
++      hostname = new URL(url).hostname.replace(/^www\./, "");
++    } catch {
++      hostname = url;
++    }
++
++    links.push({
++      url,
++      provider: rule?.provider || hostname,
++      label: rule?.label || "Open Link",
++      kind: rule?.kind || "generic",
++    });
++  }
++
++  return links;
++}
++
++const ATTACHMENT_EXTENSIONS = {
++  pdf: "pdf",
++  doc: "doc",
++  docx: "doc",
++  ppt: "ppt",
++  pptx: "ppt",
++  xls: "sheet",
++  xlsx: "sheet",
++  zip: "archive",
++  rar: "archive",
++  png: "image",
++  jpg: "image",
++  jpeg: "image",
++  gif: "image",
++  mp4: "video",
++  mov: "video",
++};
++
++const FILENAME_REGEX = new RegExp(
++  `\\b[\\w][\\w-]{0,60}\\.(${Object.keys(ATTACHMENT_EXTENSIONS).join("|")})\\b`,
++  "gi"
++);
++
++/**
++ * Finds filename-like mentions (e.g. "Assignment.pdf") in the email text.
++ * If a URL appears on the same line as the filename, it's attached as a
++ * download/preview link; otherwise the attachment is shown as "mentioned
++ * only" rather than inventing a link that doesn't exist.
++ */
++export function detectAttachments(text) {
++  if (!text) return [];
++
++  const lines = text.split("\n");
++  const found = [];
++  const seenNames = new Set();
++
++  for (const line of lines) {
++    const filenameMatches = line.match(FILENAME_REGEX) || [];
++    if (filenameMatches.length === 0) continue;
++
++    const urlsOnLine = line.match(URL_REGEX) || [];
++    const lineUrl = urlsOnLine.length > 0 ? stripTrailingPunctuation(urlsOnLine[0]) : null;
++
++    for (const rawName of filenameMatches) {
++      const name = rawName.trim();
++      const key = name.toLowerCase();
++      if (seenNames.has(key)) continue;
++      seenNames.add(key);
++
++      const ext = name.split(".").pop().toLowerCase();
++      const kind = ATTACHMENT_EXTENSIONS[ext] || "file";
++
++      found.push({
++        name,
++        extension: ext,
++        kind,
++        url: lineUrl,
++      });
++    }
++  }
++
++  return found;
++}
++
++const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
++const MONTHS = [
++  "january", "february", "march", "april", "may", "june",
++  "july", "august", "september", "october", "november", "december",
++];
++const MONTH_ABBREVIATIONS = MONTHS.map((m) => m.slice(0, 3));
++
++function nextWeekday(reference, targetDay, forceNextWeek) {
++  const result = new Date(reference);
++  const currentDay = result.getDay();
++  let diff = (targetDay - currentDay + 7) % 7;
++  if (diff === 0 || forceNextWeek) diff += 7;
++  result.setDate(result.getDate() + diff);
++  return result;
++}
++
++/**
++ * Scans text for common relative/explicit deadline phrases ("tomorrow",
++ * "Friday", "next week", "July 30", "before 5 PM") and resolves them to an
++ * actual date relative to the email's received date, where possible.
++ */
++export function detectDeadlines(text, referenceDate) {
++  if (!text) return [];
++
++  const reference = referenceDate ? new Date(referenceDate) : new Date();
++  const results = [];
++  const seen = new Set();
++
++  const addResult = (raw, date, label) => {
++    const key = `${raw.toLowerCase()}-${label}`;
++    if (seen.has(key)) return;
++    seen.add(key);
++    results.push({ raw, date: date ? date.toISOString() : null, label });
++  };
++
++  if (/\btoday\b/i.test(text)) {
++    addResult("today", reference, reference.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
++  }
++
++  if (/\btomorrow\b/i.test(text)) {
++    const date = new Date(reference);
++    date.setDate(date.getDate() + 1);
++    addResult("tomorrow", date, date.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
++  }
++
++  if (/\bnext week\b/i.test(text)) {
++    const date = new Date(reference);
++    date.setDate(date.getDate() + 7);
++    addResult("next week", date, date.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
++  }
++
++  const weekdayRegex = /\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi;
++  let weekdayMatch;
++  while ((weekdayMatch = weekdayRegex.exec(text)) !== null) {
++    const forceNextWeek = Boolean(weekdayMatch[1]);
++    const dayName = weekdayMatch[2].toLowerCase();
++    const date = nextWeekday(reference, WEEKDAYS.indexOf(dayName), forceNextWeek);
++    addResult(
++      weekdayMatch[0],
++      date,
++      date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
++    );
++  }
++
++  const monthDayRegex = new RegExp(
++    `\\b(${MONTHS.join("|")}|${MONTH_ABBREVIATIONS.join("|")})\\.?\\s+(\\d{1,2})(st|nd|rd|th)?\\b`,
++    "gi"
++  );
++  let monthMatch;
++  while ((monthMatch = monthDayRegex.exec(text)) !== null) {
++    const monthToken = monthMatch[1].toLowerCase();
++    const monthIndex = MONTHS.indexOf(monthToken) !== -1
++      ? MONTHS.indexOf(monthToken)
++      : MONTH_ABBREVIATIONS.indexOf(monthToken);
++    if (monthIndex === -1) continue;
++
++    const day = parseInt(monthMatch[2], 10);
++    let year = reference.getFullYear();
++    let date = new Date(year, monthIndex, day);
++
++    // If that date already passed relative to the reference by more than a
++    // few days, assume it means next year rather than the past.
++    if (date.getTime() < reference.getTime() - 5 * 24 * 60 * 60 * 1000) {
++      date = new Date(year + 1, monthIndex, day);
++    }
++
++    addResult(
++      monthMatch[0],
++      date,
++      date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
++    );
++  }
++
++  const timeRegex = /\b(?:before|by|at)\s+(\d{1,2}(?::\d{2})?\s?(?:am|pm))\b/gi;
++  let timeMatch;
++  while ((timeMatch = timeRegex.exec(text)) !== null) {
++    addResult(timeMatch[0], null, timeMatch[1].toUpperCase());
++  }
++
++  return results;
++}
++
++const URGENCY_KEYWORDS = [
++  "urgent", "asap", "immediately", "as soon as possible", "action required",
++  "final reminder", "last chance", "time-sensitive", "time sensitive",
++  "important:", "please respond immediately",
++];
++
++const REPLY_KEYWORDS = [
++  "please reply", "let me know", "get back to me", "rsvp", "confirm",
++  "kindly respond", "your response", "please respond", "please confirm",
++  "awaiting your reply",
++];
++
++const MEETING_KEYWORDS = ["meeting", "call at", "zoom", "google meet", "microsoft teams", "schedule a call"];
++const PAYMENT_KEYWORDS = ["payment", "invoice", "amount due", "pay now", "transaction", "fee of", "$", "₹"];
++const CONTACT_REGEX = /\+?\d[\d\-\s()]{7,}\d|\bcontact (us|me)\b|\breach out\b/i;
++
++/**
++ * Computes a small set of at-a-glance insights about the email, purely
++ * from heuristics over its own text - no AI call, no fabricated numbers.
++ */
++export function computeInsights(email, { links = [], attachments = [], deadlines = [] } = {}) {
++  const subject = email?.subject || "";
++  const body = email?.body || email?.content || email?.message || "";
++  const combined = `${subject}\n${body}`.toLowerCase();
++
++  const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
++  const readingTimeMinutes = Math.max(1, Math.round(wordCount / 200));
++
++  const urgencyHits = URGENCY_KEYWORDS.filter((kw) => combined.includes(kw)).length;
++  const isHighPriority = email?.priority === "High";
++  let urgency = "Low";
++  if (urgencyHits > 0 || isHighPriority) urgency = "High";
++  else if (deadlines.length > 0) urgency = "Medium";
++
++  const requiresReply =
++    REPLY_KEYWORDS.some((kw) => combined.includes(kw)) || /\?\s*$/.test(body.trim());
++
++  const containsMeeting =
++    MEETING_KEYWORDS.some((kw) => combined.includes(kw)) ||
++    links.some((l) => l.kind === "meeting");
++
++  const containsForm =
++    /\bsurvey\b|\bquestionnaire\b|\bform\b/.test(combined) ||
++    links.some((l) => l.kind === "form");
++
++  const containsPayment = PAYMENT_KEYWORDS.some((kw) => combined.includes(kw));
++
++  const containsAttachment =
++    attachments.length > 0 || /\battached\b|\battachment\b/.test(combined);
++
++  const containsExternalLink = links.length > 0;
++
++  const containsContactInfo = CONTACT_REGEX.test(body);
++
++  return {
++    readingTimeMinutes,
++    urgency,
++    requiresReply,
++    containsDeadline: deadlines.length > 0,
++    containsAttachment,
++    containsMeeting,
++    containsPayment,
++    containsForm,
++    containsExternalLink,
++    containsContactInfo,
++  };
++}
+-- 
+2.43.0
+
