@@ -1,10 +1,11 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { createOAuthClient } = require('../config/googleOAuth');
 const GmailConnection = require('../models/GmailConnection');
 const { google } = require('googleapis');
 
 const FRONTEND_URL =
-  process.env.FRONTEND_URL || 'http://localhost:5182';
+  process.env.FRONTEND_URL || 'http://localhost:5173';
 const makeState = (userId) => {
   const secret = process.env.JWT_SECRET || 'dev_jwt_secret';
   return jwt.sign({ userId }, secret, { expiresIn: '10m' });
@@ -83,11 +84,20 @@ const oauthCallback = async (req, res) => {
     const userId = payload.userId;
     if (!userId) return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
 
+    // ensure we use an ObjectId when storing/querying connections
+    let userObjectId;
+    try {
+      userObjectId = mongoose.Types.ObjectId(userId);
+    } catch (e) {
+      return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
+    }
+
     // create or update connection
-    const existing = await GmailConnection.findOne({ userId });
+    const existing = await GmailConnection.findOne({ userId: userObjectId });
     const now = new Date();
 
     const toSet = {
+      userId: userObjectId,
       googleEmail,
       accessToken: tokens.access_token || (existing && existing.accessToken),
       refreshToken: tokens.refresh_token || (existing && existing.refreshToken),
@@ -97,7 +107,7 @@ const oauthCallback = async (req, res) => {
     };
 
     const updated = await GmailConnection.findOneAndUpdate(
-      { userId },
+      { userId: userObjectId },
       { $set: toSet },
       { upsert: true, new: true }
     );

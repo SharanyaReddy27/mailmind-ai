@@ -2,14 +2,22 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   try {
-    const connection = await mongoose.connect(process.env.MONGO_URI);
+    const uri = process.env.MONGO_URI;
+
+    if (!uri) {
+      console.warn('MongoDB URI not provided. Skipping DB connection. Set MONGO_URI in backend/.env to enable database features.');
+      return;
+    }
+
+    const connection = await mongoose.connect(uri);
 
     console.log(
       `MongoDB connected: ${connection.connection.host}`
     );
   } catch (error) {
     console.error(`MongoDB connection failed: ${error.message}`);
-    process.exit(1);
+    // Do not exit the process here so the server can boot for local debugging.
+    // The application will surface DB-related errors on API calls if the DB is unavailable.
   }
 };
 

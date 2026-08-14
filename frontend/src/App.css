@@ -162,6 +162,16 @@
   background: var(--signal-gradient);
 }
 
+.sidebar-badge {
+  margin-left: auto;
+  background: var(--signal-amber);
+  color: var(--text-on-accent);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
 .sidebar.collapsed .sidebar-link.active::before {
   left: -3px;
 }

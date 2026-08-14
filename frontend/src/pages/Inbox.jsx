@@ -10,11 +10,10 @@ function Inbox() {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const loadEmails = () => {
+  const loadEmails = (params = {}) => {
     setLoading(true);
     api
-      .get("/emails")
+      .get("/emails", { params })
       .then((response) => {
         setEmails(response.data || []);
         setError("");
@@ -28,7 +27,21 @@ function Inbox() {
   };
 
   useEffect(() => {
-    loadEmails();
+    // support optional category filters via query string (e.g. ?domain=example.com)
+    const params = {};
+    try {
+      const url = new URL(window.location.href);
+      const domain = url.searchParams.get('domain');
+      const unread = url.searchParams.get('unread');
+      const priority = url.searchParams.get('priority');
+      if (domain) params.domain = decodeURIComponent(domain);
+      if (unread) params.unread = unread;
+      if (priority) params.priority = priority;
+    } catch (e) {
+      // ignore parse errors
+    }
+
+    loadEmails(params);
     const onSync = () => loadEmails();
     window.addEventListener('mailmind:sync', onSync);
 

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 const protect = async (req, res, next) => {
   let token;
@@ -11,6 +12,11 @@ const protect = async (req, res, next) => {
 
   if (!token) {
     return res.status(401).json({ message: 'Not authorized, token missing' });
+  }
+
+  // Verify DB connection before attempting to load user
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Database unavailable. Please try again later.' });
   }
 
   try {

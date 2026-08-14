@@ -10,7 +10,8 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
 
-router.post('/seed', seedEmails);
+// Seed route is protected to avoid accidental/public demo data injection
+router.post('/seed', protect, seedEmails);
 router.get('/', protect, getEmails);
 router.get('/:id', protect, getEmailById);
 router.post('/', protect, createEmail);

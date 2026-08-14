@@ -129,7 +129,9 @@ async function syncGmailForUser(user, limit = 20) {
     if (isInvalidGrantError(err)) {
       throw createInvalidGmailTokenError();
     }
-    throw new Error(err.message || 'Unable to fetch Gmail messages');
+    const e = new Error(err.message || 'Unable to fetch Gmail messages');
+    e.original = err;
+    throw e;
   }
   const messages = (listRes && listRes.data && listRes.data.messages) || [];
   let created = 0, skipped = 0, failed = 0;

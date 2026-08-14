@@ -8,37 +8,37 @@
 @import "@fontsource/jetbrains-mono/500.css";
 
 :root {
-  /* ---- surfaces ---- */
-  --bg-canvas: #0a0c11;
-  --bg-surface: #11141b;
-  --bg-surface-raised: #161a23;
-  --bg-elevated: #1c212c;
-  --bg-overlay: rgba(10, 12, 17, 0.78);
-  --bg-hover: rgba(255, 255, 255, 0.04);
-  --bg-active: rgba(255, 255, 255, 0.07);
+  /* ---- surfaces (light pastel) ---- */
+  --bg-canvas: #FBF9F6;
+  --bg-surface: #FFFFFF;
+  --bg-surface-raised: #F7F6F4;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(15, 15, 15, 0.06);
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
 
   /* ---- borders ---- */
-  --border-hairline: rgba(255, 255, 255, 0.07);
-  --border-default: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.2);
+  --border-hairline: #E9E6E2;
+  --border-default: #E1DDD8;
+  --border-strong: #D6D2CE;
 
   /* ---- text ---- */
-  --text-primary: #f5f6f8;
-  --text-secondary: #9ba1af;
-  --text-tertiary: #676e7d;
-  --text-disabled: #454b58;
-  --text-on-accent: #0a0c11;
+  --text-primary: #222222;
+  --text-secondary: #5a5f66;
+  --text-tertiary: #7a7f87;
+  --text-disabled: #9aa0a6;
+  --text-on-accent: #ffffff;
 
-  /* ---- signal accents ---- */
-  --signal-violet: #6e77f5;
-  --signal-violet-dim: rgba(110, 119, 245, 0.16);
-  --signal-teal: #2fd9b4;
-  --signal-teal-dim: rgba(47, 217, 180, 0.16);
-  --signal-amber: #ffa45c;
-  --signal-amber-dim: rgba(255, 164, 92, 0.16);
-  --signal-coral: #ff6b6e;
-  --signal-coral-dim: rgba(255, 107, 110, 0.16);
-  --signal-gradient: linear-gradient(135deg, #6e77f5 0%, #2fd9b4 100%);
+  /* ---- signal accents (pastel) ---- */
+  --signal-violet: #CBB7FF;
+  --signal-violet-dim: rgba(203, 183, 255, 0.16);
+  --signal-teal: #90C3A6;
+  --signal-teal-dim: rgba(144, 195, 166, 0.12);
+  --signal-amber: #FFD2B3;
+  --signal-amber-dim: rgba(255, 210, 179, 0.14);
+  --signal-coral: #FF8A8A;
+  --signal-coral-dim: rgba(255, 138, 138, 0.12);
+  --signal-gradient: linear-gradient(135deg, #CBB7FF 0%, #90C3A6 100%);
 
   /* ---- spacing ---- */
   --space-1: 4px;

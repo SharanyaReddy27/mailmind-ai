@@ -4,6 +4,8 @@ import {
   ChevronUp,
   Inbox as InboxIcon,
   LayoutGrid,
+  CheckSquare,
+  MailOpen,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -11,16 +13,24 @@ import {
   Settings as SettingsIcon,
   Sparkles,
 } from "lucide-react";
+import api from "../services/api";
+import { detectAttachments } from "../utils/emailIntelligence";
 import Avatar from "./Avatar";
+import logo from "../assets/mailmind-logo.svg";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { to: "/inbox", label: "Inbox", icon: InboxIcon },
+  { to: "/inbox?priority=High", label: "Important", icon: Sparkles },
+  { to: "/inbox?hasTasks=true", label: "Tasks", icon: CheckSquare },
+  { to: "/inbox?hasAttachments=true", label: "Attachments", icon: MailOpen },
+  { to: "/dashboard", label: "Insights", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 function Sidebar({ currentUser, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [counts, setCounts] = useState({ unread: 0, important: 0, tasks: 0, attachments: 0 });
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
   const navigate = useNavigate();
@@ -50,6 +60,35 @@ function Sidebar({ currentUser, onLogout }) {
     };
   }, [profileOpen]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCounts = async () => {
+      try {
+        const res = await api.get('/emails');
+        const emails = res.data || [];
+        const unread = emails.filter(e => e.unread).length;
+        const important = emails.filter(e => e.priority === 'High').length;
+        const tasks = emails.reduce((acc, e) => acc + ((e.aiTasks || []).length > 0 ? 1 : 0), 0);
+        const attachments = emails.reduce((acc, e) => acc + (detectAttachments((e.body || '') + ' ' + (e.snippet || '')).length > 0 ? 1 : 0), 0);
+
+        if (mounted) setCounts({ unread, important, tasks, attachments });
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    loadCounts();
+
+    const onSync = () => loadCounts();
+    window.addEventListener('mailmind:sync', onSync);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('mailmind:sync', onSync);
+    };
+  }, []);
+
   const goToSettings = () => {
     setProfileOpen(false);
     navigate("/settings");
@@ -71,7 +110,7 @@ function Sidebar({ currentUser, onLogout }) {
       <div className="sidebar-top">
         <NavLink to="/dashboard" className="brand">
           <span className="brand-mark">
-            <Sparkles size={16} strokeWidth={2.25} />
+            <img src={logo} alt="MailMind" style={{ width: 28, height: 28 }} />
           </span>
           {!collapsed && <span className="brand-name">MailMind</span>}
         </NavLink>
@@ -88,19 +127,30 @@ function Sidebar({ currentUser, onLogout }) {
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
-            title={collapsed ? label : undefined}
-          >
-            <span className="sidebar-link-icon">
-              <Icon size={17} strokeWidth={2} />
-            </span>
-            {!collapsed && <span>{label}</span>}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
+          let badge = null;
+          if (to.includes('priority=High')) badge = counts.important;
+          else if (to.includes('hasTasks=true')) badge = counts.tasks;
+          else if (to.includes('hasAttachments=true')) badge = counts.attachments;
+          else if (to === '/inbox') badge = counts.unread;
+
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
+              title={collapsed ? label : undefined}
+            >
+              <span className="sidebar-link-icon">
+                <Icon size={17} strokeWidth={2} />
+              </span>
+              {!collapsed && <span>{label}</span>}
+              {!collapsed && badge > 0 && (
+                <span className="sidebar-badge">{badge}</span>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer" ref={profileRef}>

@@ -17,29 +17,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const fallbackUser = (email) => ({
-  name: email.split("@")[0].replace(/\./g, " "),
-  email,
-});
-
-const fallbackAuth = (payload) => {
-  const email = payload?.email || payload?.user?.email || "user@mailmind.ai";
-  const token = `demo-${Date.now()}`;
-  const user = payload?.name ? { name: payload.name, email } : fallbackUser(email);
-
-  return { token, user };
-};
 
 export const login = async (credentials) => {
   try {
     const response = await api.post("/auth/login", credentials);
     return response.data;
   } catch (error) {
-    if (error?.response?.status === 404 || !error?.response) {
-      return fallbackAuth(credentials);
-    }
-
-    throw error;
+    // Provide a clearer message to the UI
+    const message = error?.response?.data?.message || 'Unable to log in. Please check your credentials and try again.';
+    const e = new Error(message);
+    e.status = error?.response?.status;
+    throw e;
   }
 };
 
@@ -48,11 +36,10 @@ export const register = async (payload) => {
     const response = await api.post("/auth/register", payload);
     return response.data;
   } catch (error) {
-    if (error?.response?.status === 404 || !error?.response) {
-      return fallbackAuth(payload);
-    }
-
-    throw error;
+    const message = error?.response?.data?.message || 'Unable to register. Please check your details and try again.';
+    const e = new Error(message);
+    e.status = error?.response?.status;
+    throw e;
   }
 };
 

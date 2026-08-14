@@ -416,10 +416,14 @@ function Dashboard() {
               ) : (
                 <div className="category-chip-list">
                   {stats.categories.map(([domain, count]) => (
-                    <span className="category-chip" key={domain}>
+                    <Link
+                      key={domain}
+                      to={`/inbox?domain=${encodeURIComponent(domain)}`}
+                      className="category-chip"
+                    >
                       {domain}
                       <span className="category-chip-count">{count}</span>
-                    </span>
+                    </Link>
                   ))}
                 </div>
               )}

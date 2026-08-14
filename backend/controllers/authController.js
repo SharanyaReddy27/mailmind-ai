@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 const generateToken = (user) => {
   const secret = process.env.JWT_SECRET || 'dev_jwt_secret';
@@ -13,6 +14,9 @@ const generateToken = (user) => {
 
 const registerUser = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Database unavailable. Please try again later.' });
+    }
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
@@ -52,6 +56,9 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Database unavailable. Please try again later.' });
+    }
     const { email, password } = req.body;
 
     if (!email || !password) {

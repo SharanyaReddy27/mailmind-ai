@@ -75,7 +75,47 @@ const deleteEmail = async (req, res) => {
 const getEmails = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-    const emails = await Email.find({ userId: req.user._id }).sort({ receivedAt: -1 });
+    const q = { userId: req.user._id };
+
+    // optional filters from query string
+    const { domain, unread, priority, hasTasks, hasAttachments, search } = req.query || {};
+
+    if (domain && typeof domain === 'string') {
+      // match senderEmail domain (case-insensitive)
+      const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      q.senderEmail = { $regex: new RegExp(`@${escaped}$`, 'i') };
+    }
+
+    if (typeof unread !== 'undefined') {
+      if (String(unread).toLowerCase() === 'true') q.unread = true;
+      else if (String(unread).toLowerCase() === 'false') q.unread = false;
+    }
+
+    if (priority && typeof priority === 'string') {
+      q.priority = priority;
+    }
+
+    if (typeof hasTasks !== 'undefined') {
+      if (String(hasTasks).toLowerCase() === 'true') q['aiTasks.0'] = { $exists: true };
+      else if (String(hasTasks).toLowerCase() === 'false') q['aiTasks.0'] = { $exists: false };
+    }
+
+    if (typeof hasAttachments !== 'undefined') {
+      if (String(hasAttachments).toLowerCase() === 'true') q['aiAttachments.0'] = { $exists: true };
+      else if (String(hasAttachments).toLowerCase() === 'false') q['aiAttachments.0'] = { $exists: false };
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const s = search.trim();
+      q.$or = [
+        { subject: { $regex: s, $options: 'i' } },
+        { body: { $regex: s, $options: 'i' } },
+        { senderName: { $regex: s, $options: 'i' } },
+        { senderEmail: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    const emails = await Email.find(q).sort({ receivedAt: -1 });
 
     res.status(200).json(emails);
   } catch (error) {
