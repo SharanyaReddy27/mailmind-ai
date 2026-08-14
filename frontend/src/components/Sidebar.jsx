@@ -69,8 +69,8 @@ function Sidebar({ currentUser, onLogout }) {
         const emails = res.data || [];
         const unread = emails.filter(e => e.unread).length;
         const important = emails.filter(e => e.priority === 'High').length;
-        const tasks = emails.reduce((acc, e) => acc + ((e.aiTasks || []).length > 0 ? 1 : 0), 0);
-        const attachments = emails.reduce((acc, e) => acc + (detectAttachments((e.body || '') + ' ' + (e.snippet || '')).length > 0 ? 1 : 0), 0);
+        const tasks = emails.reduce((acc, e) => acc + (((e.aiTasks || []).length > 0) ? 1 : 0), 0);
+        const attachments = emails.filter((e) => Boolean(e.hasAttachments) || detectAttachments((e.body || '') + ' ' + (e.snippet || '')).length > 0).length;
 
         if (mounted) setCounts({ unread, important, tasks, attachments });
       } catch (err) {

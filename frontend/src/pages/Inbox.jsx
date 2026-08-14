@@ -27,22 +27,28 @@ function Inbox() {
   };
 
   useEffect(() => {
-    // support optional category filters via query string (e.g. ?domain=example.com)
     const params = {};
     try {
       const url = new URL(window.location.href);
       const domain = url.searchParams.get('domain');
       const unread = url.searchParams.get('unread');
       const priority = url.searchParams.get('priority');
+      const hasTasks = url.searchParams.get('hasTasks');
+      const hasAttachments = url.searchParams.get('hasAttachments');
+      const search = url.searchParams.get('search');
+
       if (domain) params.domain = decodeURIComponent(domain);
       if (unread) params.unread = unread;
       if (priority) params.priority = priority;
+      if (hasTasks) params.hasTasks = hasTasks;
+      if (hasAttachments) params.hasAttachments = hasAttachments;
+      if (search) params.search = search;
     } catch (e) {
       // ignore parse errors
     }
 
     loadEmails(params);
-    const onSync = () => loadEmails();
+    const onSync = () => loadEmails(params);
     window.addEventListener('mailmind:sync', onSync);
 
     return () => window.removeEventListener('mailmind:sync', onSync);

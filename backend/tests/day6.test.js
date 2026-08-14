@@ -53,12 +53,12 @@ const run = async () => {
     const url = new URL(auth.authUrl);
     ok('Auth URL has state', !!url.searchParams.get('state'));
 
-    // callback without code -> expect redirect to frontend error
-    res = await fetch(`${base}/gmail/callback`);
+    // callback without code -> expect redirect to frontend error without following the redirect
+    res = await fetch(`${base}/gmail/callback`, { redirect: 'manual' });
     ok('Callback without code', res.status === 302 || res.status === 200);
 
-    // callback with invalid state -> redirect error
-    res = await fetch(`${base}/gmail/callback?state=invalid&code=abc`);
+    // callback with invalid state -> redirect error without following the redirect
+    res = await fetch(`${base}/gmail/callback?state=invalid&code=abc`, { redirect: 'manual' });
     ok('Callback invalid state', res.status === 302 || res.status === 200);
 
     // status for unconnected user

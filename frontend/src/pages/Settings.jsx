@@ -24,6 +24,7 @@ function Settings() {
     try {
       const res = await getGmailStatus();
       setStatus(res);
+      setNeedsReconnect(Boolean(res?.needsReconnect));
     } catch (err) {
       setError(err.message || 'Unable to load Gmail status');
     } finally {
@@ -137,14 +138,15 @@ function Settings() {
             <div>
               <div className="integration-status-line">
                 <CheckCircle2 size={15} strokeWidth={2.25} className="integration-status-icon" />
-                <span>Connected as {status.googleEmail}</span>
+                <span>Connected as {status.googleEmail || 'your Gmail account'}</span>
               </div>
+              <p className="integration-detail">Status: Connected</p>
               <p className="integration-detail">Connected at: {status.connectedAt || '—'}</p>
               <p className="integration-detail">Last synced: {status.lastSyncedAt || '—'}</p>
 
               {(status.hasRefreshToken === false || needsReconnect) && (
                 <p className="integration-detail warning">
-                  Gmail credentials are incomplete or have expired. Reconnect Gmail to restore sync.
+                  Your Gmail permission needs to be renewed. Reconnect Gmail.
                 </p>
               )}
 
@@ -164,9 +166,11 @@ function Settings() {
             </div>
           ) : (
             <div>
-              <p>Not connected.</p>
+              <p>{status?.needsReconnect ? 'Your Gmail permission needs to be renewed. Reconnect Gmail.' : 'Not connected.'}</p>
               <div className="integration-actions">
-                <button type="button" onClick={handleConnect} className="primary">Connect Gmail</button>
+                <button type="button" onClick={handleConnect} className="primary">
+                  {status?.needsReconnect ? 'Reconnect Gmail' : 'Connect Gmail'}
+                </button>
               </div>
             </div>
           )}

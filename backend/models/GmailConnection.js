@@ -9,7 +9,7 @@ const gmailConnectionSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-    googleEmail: { type: String, required: true, lowercase: true, trim: true },
+    googleEmail: { type: String, lowercase: true, trim: true },
     accessToken: { type: String },
     refreshToken: { type: String },
     tokenExpiry: { type: Date },

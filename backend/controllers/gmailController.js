@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const { createOAuthClient } = require('../config/googleOAuth');
+const { createOAuthClient, REQUIRED_GMAIL_SCOPES, hasRequiredGmailScopes } = require('../config/googleOAuth');
 const GmailConnection = require('../models/GmailConnection');
 const { google } = require('googleapis');
 
@@ -25,23 +25,14 @@ const getAuthUrl = async (req, res) => {
       });
     }
 
-    console.log("Gmail auth URL endpoint reached");
-
     const state = makeState(req.user._id.toString());
-
-    const scopes = [
-      "https://www.googleapis.com/auth/gmail.modify",
-      "openid",
-      "email",
-    ];
-
     const oAuth2Client = createOAuthClient();
 
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: "offline",
       include_granted_scopes: true,
       prompt: "consent",
-      scope: scopes,
+      scope: REQUIRED_GMAIL_SCOPES,
       state,
     });
 
@@ -63,6 +54,7 @@ const oauthCallback = async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!state) return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
+
     let payload;
     try {
       payload = verifyState(state);
@@ -76,7 +68,6 @@ const oauthCallback = async (req, res) => {
     const { tokens } = await oAuth2Client.getToken(code);
     oAuth2Client.setCredentials(tokens);
 
-    // get connected account email
     const oauth2 = google.oauth2({ auth: oAuth2Client, version: 'v2' });
     const userinfo = await oauth2.userinfo.get();
     const googleEmail = (userinfo && userinfo.data && userinfo.data.email) || null;
@@ -84,7 +75,6 @@ const oauthCallback = async (req, res) => {
     const userId = payload.userId;
     if (!userId) return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
 
-    // ensure we use an ObjectId when storing/querying connections
     let userObjectId;
     try {
       userObjectId = mongoose.Types.ObjectId(userId);
@@ -92,27 +82,31 @@ const oauthCallback = async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
     }
 
-    // create or update connection
     const existing = await GmailConnection.findOne({ userId: userObjectId });
     const now = new Date();
+    const grantedScopes = tokens.scope || existing?.scope || '';
 
     const toSet = {
       userId: userObjectId,
-      googleEmail,
+      googleEmail: googleEmail || existing?.googleEmail || null,
       accessToken: tokens.access_token || (existing && existing.accessToken),
       refreshToken: tokens.refresh_token || (existing && existing.refreshToken),
       tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : (existing && existing.tokenExpiry),
-      scope: tokens.scope || (existing && existing.scope),
+      scope: grantedScopes,
       connectedAt: existing ? existing.connectedAt || now : now,
     };
 
-    const updated = await GmailConnection.findOneAndUpdate(
+    await GmailConnection.findOneAndUpdate(
       { userId: userObjectId },
       { $set: toSet },
       { upsert: true, new: true }
     );
 
-    return res.redirect(`${FRONTEND_URL}/settings?gmail=connected`);
+    return res.redirect(
+      hasRequiredGmailScopes(grantedScopes)
+        ? `${FRONTEND_URL}/settings?gmail=connected`
+        : `${FRONTEND_URL}/settings?gmail=needs_reconnect`
+    );
   } catch (error) {
     return res.redirect(`${FRONTEND_URL}/settings?gmail=error`);
   }
@@ -122,14 +116,22 @@ const status = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const conn = await GmailConnection.findOne({ userId: req.user._id });
-    if (!conn) return res.json({ success: true, connected: false });
+    if (!conn) return res.json({ success: true, connected: false, needsReconnect: false });
+
+    const scopeGranted = conn.scope || '';
+    const needsReconnect = !conn.refreshToken || !hasRequiredGmailScopes(scopeGranted);
+
     return res.json({
       success: true,
-      connected: true,
+      connected: Boolean(conn.refreshToken) && !needsReconnect,
+      needsReconnect,
       googleEmail: conn.googleEmail,
       connectedAt: conn.connectedAt,
       lastSyncedAt: conn.lastSyncedAt,
       hasRefreshToken: Boolean(conn.refreshToken),
+      scope: scopeGranted,
+      status: needsReconnect ? 'needs_reconnect' : 'connected',
+      message: needsReconnect ? 'Your Gmail permission needs to be renewed. Reconnect Gmail.' : 'Connected',
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Unable to fetch status' });

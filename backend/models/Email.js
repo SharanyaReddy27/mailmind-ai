@@ -68,6 +68,11 @@ const emailSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    hasAttachments: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
 
     // Persisted results of the last AI action run against this email, so
     // the dashboard can surface real "recent AI activity" instead of

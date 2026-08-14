@@ -77,11 +77,9 @@ const getEmails = async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     const q = { userId: req.user._id };
 
-    // optional filters from query string
     const { domain, unread, priority, hasTasks, hasAttachments, search } = req.query || {};
 
     if (domain && typeof domain === 'string') {
-      // match senderEmail domain (case-insensitive)
       const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       q.senderEmail = { $regex: new RegExp(`@${escaped}$`, 'i') };
     }
@@ -101,8 +99,8 @@ const getEmails = async (req, res) => {
     }
 
     if (typeof hasAttachments !== 'undefined') {
-      if (String(hasAttachments).toLowerCase() === 'true') q['aiAttachments.0'] = { $exists: true };
-      else if (String(hasAttachments).toLowerCase() === 'false') q['aiAttachments.0'] = { $exists: false };
+      if (String(hasAttachments).toLowerCase() === 'true') q.hasAttachments = true;
+      else if (String(hasAttachments).toLowerCase() === 'false') q.hasAttachments = false;
     }
 
     if (search && typeof search === 'string' && search.trim()) {

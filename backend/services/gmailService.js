@@ -1,30 +1,10 @@
 const { google } = require('googleapis');
 const GmailConnection = require('../models/GmailConnection');
 const Email = require('../models/Email');
-const { createOAuthClient } = require('../config/googleOAuth');
-
-const connectGmail = async (req, res) => {
-  try {
-    const oauth2Client = createOAuthClient();
-
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      prompt: 'consent',
-      scope: [
-        'https://www.googleapis.com/auth/gmail.modify'
-      ]
-    });
-
-    res.json({ authUrl });
-  } catch (error) {
-    console.error('Gmail connect error:', error.message);
-    res.status(500).json({ message: error.message });
-  }
-};
+const { createOAuthClient, hasRequiredGmailScopes } = require('../config/googleOAuth');
 
 function decodeBase64Url(str) {
   if (!str) return '';
-  // base64url to base64
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   while (str.length % 4) str += '=';
   return Buffer.from(str, 'base64').toString('utf8');
@@ -40,11 +20,9 @@ function parseHeaders(headers) {
 
 function extractBody(payload) {
   if (!payload) return '';
-  // if body is directly in payload
   if (payload.body && payload.body.data) return decodeBase64Url(payload.body.data);
 
   if (!payload.parts) return '';
-  // recursive search: prefer text/plain
   const stack = [...payload.parts];
   let html = '';
   while (stack.length) {
@@ -53,7 +31,6 @@ function extractBody(payload) {
     if (part.mimeType === 'text/plain' && part.body && part.body.data) return decodeBase64Url(part.body.data);
     if (part.mimeType === 'text/html' && part.body && part.body.data) html = decodeBase64Url(part.body.data);
   }
-  // fallback to html converted to text (strip tags)
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -77,7 +54,7 @@ const isInvalidGrantError = (error) => {
 
 const createInvalidGmailTokenError = () => {
   const error = new Error(
-    'Gmail credentials are no longer valid. Please reconnect Gmail to restore sync.'
+    'Your Gmail permission needs to be renewed. Reconnect Gmail.'
   );
   error.code = 'INVALID_GMAIL_TOKEN';
   error.status = 401;
@@ -93,8 +70,8 @@ async function syncGmailForUser(user, limit = 20) {
     throw e;
   }
 
-  if (!conn.refreshToken) {
-    const e = new Error('No Gmail refresh token available. Reconnect Gmail.');
+  if (!conn.refreshToken || !hasRequiredGmailScopes(conn.scope || '')) {
+    const e = createInvalidGmailTokenError();
     e.code = 'INVALID_GMAIL_TOKEN';
     throw e;
   }
@@ -133,6 +110,7 @@ async function syncGmailForUser(user, limit = 20) {
     e.original = err;
     throw e;
   }
+
   const messages = (listRes && listRes.data && listRes.data.messages) || [];
   let created = 0, skipped = 0, failed = 0;
 
@@ -144,25 +122,31 @@ async function syncGmailForUser(user, limit = 20) {
 
       const headers = parseHeaders(gm.payload && gm.payload.headers);
       const from = headers['from'] || '';
-      const to = headers['to'] || '';
       const subject = headers['subject'] || '(no subject)';
       const date = headers['date'] ? new Date(headers['date']) : (gm.internalDate ? new Date(parseInt(gm.internalDate, 10)) : new Date());
-      const messageId = headers['message-id'] || gm.id;
+      const labelIds = Array.isArray(gm.labelIds) ? gm.labelIds : [];
+      const isImportant = labelIds.includes('IMPORTANT') || /importance.*high|priority.*high/i.test(headers.importance || '');
+      const bodyText = extractBody(gm.payload) || '';
+      const hasAttachments = Boolean(
+        (gm.payload && gm.payload.parts && gm.payload.parts.some((part) => part.filename && part.filename.trim())) ||
+        /\b(?:pdf|docx?|pptx?|xlsx?|zip|rar|png|jpg|jpeg|gif)\b/i.test(bodyText)
+      );
 
-      // prepare email doc
       const emailDoc = {
         userId: user._id,
         source: 'gmail',
         externalMessageId: gm.id,
         externalThreadId: gm.threadId,
-        gmailLabels: gm.labelIds || [],
+        gmailLabels: labelIds,
         snippet: gm.snippet || '',
         receivedAt: date,
         subject,
-        body: extractBody(gm.payload) || '',
+        body: bodyText,
+        hasAttachments,
+        unread: labelIds.includes('UNREAD') || !labelIds.includes('READ'),
+        priority: isImportant ? 'High' : (String(headers.importance || '').toLowerCase() === 'low' ? 'Low' : 'Medium'),
       };
 
-      // parse sender name/email roughly
       const match = from.match(/(.*)<(.+@.+)>/);
       if (match) {
         emailDoc.senderName = match[1].trim().replace(/\"/g, '');
@@ -172,7 +156,6 @@ async function syncGmailForUser(user, limit = 20) {
         emailDoc.senderEmail = '';
       }
 
-      // try insert, skip duplicates
       try {
         await Email.create(emailDoc);
         created++;

@@ -4,18 +4,20 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = "gemini-2.0-flash";
-const BLOCKED_MODELS = new Set(["gemini-2.5-flash", "gemini-3.5-flash"]);
+const SUPPORTED_MODELS = new Set([
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+]);
 const configuredModel = process.env.GEMINI_MODEL;
-const MODEL_NAME =
-  configuredModel && !BLOCKED_MODELS.has(configuredModel)
-    ? configuredModel
-    : DEFAULT_MODEL;
 
-if (configuredModel && configuredModel !== MODEL_NAME) {
-  console.warn(
-    `[config/ai] GEMINI_MODEL value "${configuredModel}" is unsupported; falling back to ${MODEL_NAME}`
+if (configuredModel && !SUPPORTED_MODELS.has(configuredModel)) {
+  throw new Error(
+    `[config/ai] GEMINI_MODEL value "${configuredModel}" is unsupported by the installed @google/generative-ai SDK. Use one of: ${Array.from(SUPPORTED_MODELS).join(", ")}.`
   );
 }
+
+const MODEL_NAME = configuredModel || DEFAULT_MODEL;
 
 if (!API_KEY) {
   console.warn(
@@ -43,4 +45,5 @@ const getAIModel = () => {
 module.exports = {
   getAIModel,
   MODEL_NAME,
+  SUPPORTED_MODELS,
 };

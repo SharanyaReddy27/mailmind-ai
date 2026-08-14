@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const mongoose = require('mongoose');
+const { ensureDbConnected } = require('../config/db');
 
 const generateToken = (user) => {
   const secret = process.env.JWT_SECRET || 'dev_jwt_secret';
@@ -14,12 +14,14 @@ const generateToken = (user) => {
 
 const registerUser = async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
+    const connected = await ensureDbConnected();
+    if (!connected) {
       return res.status(503).json({ message: 'Database unavailable. Please try again later.' });
     }
     const { name, email, password } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ message: 'name, email and password are required' });
     }
 
@@ -27,7 +29,7 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(400).json({ message: 'Email already registered' });
     }
@@ -35,7 +37,7 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(password, salt);
 
-    const user = await User.create({ name, email, password: hashed });
+    const user = await User.create({ name, email: normalizedEmail, password: hashed });
 
     const token = generateToken(user);
 
@@ -56,16 +58,18 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
+    const connected = await ensureDbConnected();
+    if (!connected) {
       return res.status(503).json({ message: 'Database unavailable. Please try again later.' });
     }
     const { email, password } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: 'email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
