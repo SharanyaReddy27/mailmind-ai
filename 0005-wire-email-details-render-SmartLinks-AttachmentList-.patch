@@ -1,0 +1,65 @@
+From b3518f151d1d09da8b575c6d6f8d5a9e7402a273 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 30 Jul 2026 11:09:54 +0000
+Subject: [PATCH 5/6] wire(email-details): render SmartLinks, AttachmentList,
+ EmailInsights
+
+Computed from the already-loaded email (subject/body/receivedAt) and
+rendered below the email body, above the existing AI workspace panel.
+No changes to the AI action buttons, tone modal, tabs, or existing
+Summary/Reply/Tasks flow.
+---
+ frontend/src/pages/EmailDetails.jsx | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/frontend/src/pages/EmailDetails.jsx b/frontend/src/pages/EmailDetails.jsx
+index 7dda16c..bf0b372 100644
+--- a/frontend/src/pages/EmailDetails.jsx
++++ b/frontend/src/pages/EmailDetails.jsx
+@@ -8,10 +8,19 @@ import {
+   generateReply,
+   summarizeEmail,
+ } from "../services/aiService";
++import {
++  computeInsights,
++  detectAttachments,
++  detectDeadlines,
++  detectLinks,
++} from "../utils/emailIntelligence";
+ import Avatar from "../components/Avatar";
++import AttachmentList from "../components/AttachmentList";
++import EmailInsights from "../components/EmailInsights";
+ import ErrorMessage from "../components/ErrorMessage";
+ import LoadingSpinner from "../components/LoadingSpinner";
+ import ReplyCard from "../components/ReplyCard";
++import SmartLinks from "../components/SmartLinks";
+ import SummaryCard from "../components/SummaryCard";
+ import TaskCard from "../components/TaskCard";
+ 
+@@ -223,6 +232,12 @@ const handleClearReply = () => {
+   const senderName =
+     email.senderName || email.sender || email.senderEmail || "Unknown sender";
+ 
++  const combinedText = `${email.subject || ""}\n${body}`;
++  const links = detectLinks(combinedText);
++  const attachments = detectAttachments(combinedText);
++  const deadlines = detectDeadlines(combinedText, receivedAt);
++  const insights = computeInsights(email, { links, attachments, deadlines });
++
+   const formatDate = (value) => {
+     if (!value) {
+       return "No date";
+@@ -279,6 +294,10 @@ const handleClearReply = () => {
+             <p className="email-body">{body}</p>
+           </div>
+ 
++          <SmartLinks links={links} />
++          <AttachmentList attachments={attachments} />
++          <EmailInsights insights={insights} deadlines={deadlines} />
++
+           {error && <ErrorMessage title="AI request failed" message={error} />}
+         </div>
+ 
+-- 
+2.43.0
+

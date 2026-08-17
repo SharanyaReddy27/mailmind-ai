@@ -1,40 +1,122 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { RefreshCw } from "lucide-react";
 import api from "../services/api";
 import EmailCard from "../components/EmailCard";
+import ErrorMessage from "../components/ErrorMessage";
+import { InboxSkeleton } from "../components/LoadingSpinner";
 
 function Inbox() {
+  const location = useLocation();
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
+  const loadEmails = (params = {}) => {
+    setLoading(true);
     api
-      .get("/emails")
+      .get("/emails", { params })
       .then((response) => {
-        setEmails(response.data);
+        setEmails(response.data || []);
         setError("");
       })
       .catch(() => {
-        setError("Backend is not connected.");
+        setError("Unable to connect to backend.");
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  };
+
+  useEffect(() => {
+    const params = {};
+    try {
+      const url = new URL(window.location.href);
+      const domain = url.searchParams.get('domain');
+      const unread = url.searchParams.get('unread');
+      const priority = url.searchParams.get('priority');
+      const hasTasks = url.searchParams.get('hasTasks');
+      const hasAttachments = url.searchParams.get('hasAttachments');
+      const search = url.searchParams.get('search');
+
+      if (domain) params.domain = decodeURIComponent(domain);
+      if (unread) params.unread = unread;
+      if (priority) params.priority = priority;
+      if (hasTasks) params.hasTasks = hasTasks;
+      if (hasAttachments) params.hasAttachments = hasAttachments;
+      if (search) params.search = search;
+    } catch (e) {
+      // ignore parse errors
+    }
+
+    loadEmails(params);
+    const onSync = () => loadEmails(params);
+    window.addEventListener('mailmind:sync', onSync);
+
+    return () => window.removeEventListener('mailmind:sync', onSync);
+  }, [location.search]);
 
   if (loading) {
-    return <p>Loading emails...</p>;
+    return (
+      <div className="page-shell">
+        <div className="page-header">
+          <div>
+            <h1>MailMind Inbox</h1>
+            <p>Your latest messages in one place.</p>
+          </div>
+        </div>
+        <InboxSkeleton />
+      </div>
+    );
   }
 
   return (
-    <div>
-      <h1>MailMind Inbox</h1>
+    <div className="page-shell">
+      <div className="page-header">
+        <div>
+          <h1>MailMind Inbox</h1>
+          <p>Your latest messages in one place.</p>
+        </div>
+        <div className="page-header-actions">
+          <button type="button" className="refresh-button" onClick={loadEmails}>
+            <RefreshCw size={14} strokeWidth={2.25} />
+            Refresh
+          </button>
+          <span className="pill">{emails.length} emails</span>
+        </div>
+      </div>
 
-      {error && <p>{error}</p>}
+      {error && <ErrorMessage title="Connection issue" message={error} />}
 
-      {emails.map((email) => (
-        <EmailCard key={email.id} email={email} />
-      ))}
+      {!error && emails.length === 0 && (
+        <div className="empty-state empty-state--panel">
+          <p>No emails found.</p>
+          <span>Connect Gmail from Settings or check back soon.</span>
+        </div>
+      )}
+
+      <motion.div
+        className="inbox-grid"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.035 } },
+        }}
+      >
+        {emails.map((email) => (
+          <motion.div
+            key={email._id || email.id}
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              visible: { opacity: 1, y: 0 },
+            }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <EmailCard email={email} />
+          </motion.div>
+        ))}
+      </motion.div>
     </div>
   );
 }

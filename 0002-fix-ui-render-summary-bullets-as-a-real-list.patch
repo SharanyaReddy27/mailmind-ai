@@ -1,0 +1,79 @@
+From 4f569db294016a5d5d1ef61e88cece7e7cf3a1fc Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 30 Jul 2026 01:38:57 +0000
+Subject: [PATCH 2/2] fix(ui): render summary bullets as a real list
+
+SummaryCard was rendering the AI summary as a single <p> with no
+white-space handling, so multi-line bullet output collapsed visually
+into a run-on paragraph. It now splits on newlines and renders as a
+proper <ul>, with graceful fallback to a plain paragraph for single-line
+summaries. Matters more now that summaries are 4-7 bullets instead of
+1-2 lines.
+---
+ frontend/src/App.css                    | 15 +++++++++++++++
+ frontend/src/components/SummaryCard.jsx | 16 +++++++++++++++-
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/frontend/src/App.css b/frontend/src/App.css
+index d779ba7..2044ba5 100644
+--- a/frontend/src/App.css
++++ b/frontend/src/App.css
+@@ -1561,6 +1561,21 @@
+   color: var(--text-primary) !important;
+ }
+ 
++.summary-bullet-list {
++  margin: 0;
++  padding-left: 18px;
++  display: flex;
++  flex-direction: column;
++  gap: 8px;
++  color: var(--text-primary);
++  font-size: 13px;
++  line-height: 1.6;
++}
++
++.summary-bullet-list li::marker {
++  color: var(--signal-coral);
++}
++
+ .reply-label {
+   display: block;
+   font-size: 11px;
+diff --git a/frontend/src/components/SummaryCard.jsx b/frontend/src/components/SummaryCard.jsx
+index 24a2d9c..4586328 100644
+--- a/frontend/src/components/SummaryCard.jsx
++++ b/frontend/src/components/SummaryCard.jsx
+@@ -5,6 +5,11 @@ function SummaryCard({ title, content, onCopy, onRegenerate, copied, regeneratin
+     return null;
+   }
+ 
++  const bullets = content
++    .split("\n")
++    .map((line) => line.trim())
++    .filter(Boolean);
++
+   return (
+     <div className="result-card summary-card signal-card">
+       <div className="result-card-header">
+@@ -13,7 +18,16 @@ function SummaryCard({ title, content, onCopy, onRegenerate, copied, regeneratin
+         </span>
+         <h4>{title}</h4>
+       </div>
+-      <p className="signal-card-body">{content}</p>
++
++      {bullets.length > 1 ? (
++        <ul className="summary-bullet-list">
++          {bullets.map((line, index) => (
++            <li key={index}>{line.replace(/^[•\-*]\s*/, "")}</li>
++          ))}
++        </ul>
++      ) : (
++        <p className="signal-card-body">{content}</p>
++      )}
+ 
+       {(onCopy || onRegenerate) && (
+         <div className="reply-toolbar">
+-- 
+2.43.0
+

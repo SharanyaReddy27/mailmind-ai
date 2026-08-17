@@ -1,0 +1,58 @@
+From 5699b778a8e76ece20d1572d5e1dfd6058574323 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 30 Jul 2026 11:09:38 +0000
+Subject: [PATCH 3/6] feat(tasks): render assignee and link in TaskCard
+
+TaskCard already rendered task.assignee if present (unused until now
+since the backend never sent it). Adds:
+- An 'Open link' action in the task meta row when task.link is present.
+- assignee and link included in the Copy/Export text output alongside
+  title/deadline/priority.
+---
+ frontend/src/components/TaskCard.jsx | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/frontend/src/components/TaskCard.jsx b/frontend/src/components/TaskCard.jsx
+index aafdb04..0187b18 100644
+--- a/frontend/src/components/TaskCard.jsx
++++ b/frontend/src/components/TaskCard.jsx
+@@ -1,5 +1,5 @@
+ import { useState } from "react";
+-import { CalendarDays, CheckSquare, Copy, Download, RotateCcw, User } from "lucide-react";
++import { CalendarDays, CheckSquare, Copy, Download, Link as LinkIcon, RotateCcw, User } from "lucide-react";
+ 
+ function TaskCard({ tasks, onRetry, retrying }) {
+   const [checkedTasks, setCheckedTasks] = useState({});
+@@ -19,8 +19,10 @@ function TaskCard({ tasks, onRetry, retrying }) {
+ 
+   const formatTask = (task) => {
+     const lines = [`- ${task.title}`];
++    if (task.assignee) lines.push(`Assignee: ${task.assignee}`);
+     if (task.deadline) lines.push(`Deadline: ${task.deadline}`);
+     if (task.priority) lines.push(`Priority: ${task.priority}`);
++    if (task.link) lines.push(`Link: ${task.link}`);
+     return lines.join("\n");
+   };
+ 
+@@ -142,6 +144,18 @@ function TaskCard({ tasks, onRetry, retrying }) {
+                       {task.assignee}
+                     </span>
+                   )}
++
++                  {task.link && (
++                    <a
++                      href={task.link}
++                      target="_blank"
++                      rel="noopener noreferrer"
++                      className="task-link"
++                    >
++                      <LinkIcon size={12} strokeWidth={2.25} />
++                      Open link
++                    </a>
++                  )}
+                 </div>
+               </div>
+ 
+-- 
+2.43.0
+

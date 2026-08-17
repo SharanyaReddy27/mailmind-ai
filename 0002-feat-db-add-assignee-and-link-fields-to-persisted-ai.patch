@@ -1,0 +1,32 @@
+From 17bffe6a8dbfed7c7c4aab4046c7b7a2a50031dd Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 30 Jul 2026 11:09:34 +0000
+Subject: [PATCH 2/6] feat(db): add assignee and link fields to persisted
+ aiTasks
+
+Additive, backward-compatible schema change - existing documents/tasks
+without these fields are unaffected (Mongoose just returns them as
+undefined). Needed so the new assignee/link output from task extraction
+actually gets persisted alongside title/deadline/priority.
+---
+ backend/models/Email.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/backend/models/Email.js b/backend/models/Email.js
+index b8bb7a0..0a39f0c 100644
+--- a/backend/models/Email.js
++++ b/backend/models/Email.js
+@@ -96,8 +96,10 @@ const emailSchema = new mongoose.Schema(
+       type: [
+         {
+           title: String,
++          assignee: String,
+           deadline: String,
+           priority: String,
++          link: String,
+         },
+       ],
+       default: [],
+-- 
+2.43.0
+
