@@ -61,8 +61,8 @@ const createInvalidGmailTokenError = () => {
   return error;
 };
 
-async function syncGmailForUser(user, limit = 20) {
-  console.log('======== SYNC REQUEST ========', { userId: user?._id?.toString(), limit });
+async function syncGmailForUser(user, limit = 20, pageToken = null) {
+  console.log('======== SYNC REQUEST ========', { userId: user?._id?.toString(), limit, pageToken: pageToken ? '(provided)' : null });
   const conn = await GmailConnection.findOne({ userId: user._id });
   if (!conn) {
     const e = new Error('No connection');
@@ -100,7 +100,11 @@ async function syncGmailForUser(user, limit = 20) {
 
   let listRes;
   try {
-    listRes = await gmail.users.messages.list({ userId: 'me', maxResults: limit });
+    const listParams = { userId: 'me', maxResults: limit };
+    if (pageToken) {
+      listParams.pageToken = pageToken;
+    }
+    listRes = await gmail.users.messages.list(listParams);
   } catch (err) {
     console.error('Gmail list messages failed:', err.message);
     if (isInvalidGrantError(err)) {
@@ -112,6 +116,7 @@ async function syncGmailForUser(user, limit = 20) {
   }
 
   const messages = (listRes && listRes.data && listRes.data.messages) || [];
+  const nextPageToken = (listRes && listRes.data && listRes.data.nextPageToken) || null;
   let created = 0, skipped = 0, failed = 0;
 
   for (const m of messages) {
@@ -173,9 +178,9 @@ async function syncGmailForUser(user, limit = 20) {
 
   conn.lastSyncedAt = new Date();
   await conn.save();
-  console.log('======== SYNC RESPONSE ========', { fetched: messages.length, created, skipped, failed });
+  console.log('======== SYNC RESPONSE ========', { fetched: messages.length, created, skipped, failed, hasNextPage: Boolean(nextPageToken) });
 
-  return { message: 'Gmail synchronization completed', fetched: messages.length, created, skipped, failed, lastSyncedAt: conn.lastSyncedAt };
+  return { message: 'Gmail synchronization completed', fetched: messages.length, created, skipped, failed, lastSyncedAt: conn.lastSyncedAt, nextPageToken };
 }
 
 module.exports = { syncGmailForUser };

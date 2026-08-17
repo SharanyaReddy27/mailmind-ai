@@ -93,9 +93,13 @@ export const getGmailStatus = async () => {
   }
 };
 
-export const syncGmail = async (limit = 20) => {
+export const syncGmail = async (limit = 20, pageToken = null) => {
   try {
-    const res = await api.post('/gmail/sync', { limit });
+    const body = { limit };
+    if (pageToken) {
+      body.pageToken = pageToken;
+    }
+    const res = await api.post('/gmail/sync', body);
     return res.data;
   } catch (err) {
     throw buildApiError(err, 'Unable to sync Gmail');

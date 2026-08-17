@@ -9,9 +9,10 @@ router.get('/status', protect, status);
 router.post('/sync', protect, async (req, res) => {
   const gmailService = require('../services/gmailService');
   const limit = parseInt(req.body.limit, 10) || 20;
+  const pageToken = req.body.pageToken || null;
   if (isNaN(limit) || limit <= 0 || limit > 50) return res.status(400).json({ success: false, message: 'Invalid limit' });
   try {
-    const result = await gmailService.syncGmailForUser(req.user, limit);
+    const result = await gmailService.syncGmailForUser(req.user, limit, pageToken);
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('======== SYNC ERROR ========', err);

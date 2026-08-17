@@ -16,6 +16,7 @@ function Settings() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [nextPageToken, setNextPageToken] = useState(null);
   const navigate = useNavigate();
 
   const loadStatus = async () => {
@@ -75,9 +76,13 @@ function Settings() {
     setSyncing(true);
     setError('');
     setSyncResult(null);
+    setNextPageToken(null);
     try {
       const res = await syncGmail(20);
       setSyncResult(res);
+      if (res.nextPageToken) {
+        setNextPageToken(res.nextPageToken);
+      }
       // notify inbox to refresh
       window.dispatchEvent(new CustomEvent('mailmind:sync'));
       // refresh status
@@ -87,6 +92,36 @@ function Settings() {
       setError(message);
       setErrorStatus(err?.status || null);
       setNeedsReconnect(err?.status === 401 || message.toLowerCase().includes('reconnect'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!nextPageToken) return;
+    setSyncing(true);
+    setError('');
+    try {
+      const res = await syncGmail(20, nextPageToken);
+      setSyncResult(prev => ({
+        ...prev,
+        message: 'More emails loaded',
+        fetched: (prev?.fetched || 0) + res.fetched,
+        created: (prev?.created || 0) + res.created,
+        skipped: (prev?.skipped || 0) + res.skipped,
+        failed: (prev?.failed || 0) + res.failed,
+      }));
+      if (res.nextPageToken) {
+        setNextPageToken(res.nextPageToken);
+      } else {
+        setNextPageToken(null);
+      }
+      // notify inbox to refresh
+      window.dispatchEvent(new CustomEvent('mailmind:sync'));
+    } catch (err) {
+      const message = err?.message || 'Failed to load more emails';
+      setError(message);
+      setErrorStatus(err?.status || null);
     } finally {
       setSyncing(false);
     }
@@ -184,6 +219,12 @@ function Settings() {
                 <span>Skipped <strong>{syncResult.skipped}</strong></span>
                 <span>Failed <strong>{syncResult.failed}</strong></span>
               </div>
+              {nextPageToken && (
+                <button type="button" disabled={syncing} onClick={handleLoadMore} className="secondary" style={{ marginTop: '10px' }}>
+                  <RefreshCw size={14} strokeWidth={2.25} />
+                  {syncing ? 'Loading more…' : 'Load More Emails'}
+                </button>
+              )}
             </div>
           )}
         </div>
