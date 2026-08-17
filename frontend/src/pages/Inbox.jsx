@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import api from "../services/api";
@@ -7,6 +8,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import { InboxSkeleton } from "../components/LoadingSpinner";
 
 function Inbox() {
+  const location = useLocation();
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,7 +54,7 @@ function Inbox() {
     window.addEventListener('mailmind:sync', onSync);
 
     return () => window.removeEventListener('mailmind:sync', onSync);
-  }, []);
+  }, [location.search]);
 
   if (loading) {
     return (

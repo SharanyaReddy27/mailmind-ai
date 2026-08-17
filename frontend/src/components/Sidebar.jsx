@@ -5,13 +5,11 @@ import {
   Inbox as InboxIcon,
   LayoutGrid,
   CheckSquare,
-  MailOpen,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Repeat,
   Settings as SettingsIcon,
-  Sparkles,
 } from "lucide-react";
 import api from "../services/api";
 import { detectAttachments } from "../utils/emailIntelligence";
@@ -21,10 +19,7 @@ import logo from "../assets/mailmind-logo.svg";
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { to: "/inbox", label: "Inbox", icon: InboxIcon },
-  { to: "/inbox?priority=High", label: "Important", icon: Sparkles },
   { to: "/inbox?hasTasks=true", label: "Tasks", icon: CheckSquare },
-  { to: "/inbox?hasAttachments=true", label: "Attachments", icon: MailOpen },
-  { to: "/dashboard", label: "Insights", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
