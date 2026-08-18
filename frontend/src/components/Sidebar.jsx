@@ -62,7 +62,13 @@ function Sidebar({ currentUser, onLogout }) {
       try {
         const res = await api.get('/emails');
         const emails = res.data || [];
-        const unread = emails.filter(e => e.unread).length;
+        const unread = emails.filter((e) =>
+          typeof e.unread === "boolean"
+            ? e.unread
+            : typeof e.isRead === "boolean"
+            ? !e.isRead
+            : Boolean(e.unread)
+        ).length;
         const important = emails.filter(e => e.priority === 'High').length;
         const tasks = emails.reduce((acc, e) => acc + (((e.aiTasks || []).length > 0) ? 1 : 0), 0);
         const attachments = emails.filter((e) => Boolean(e.hasAttachments) || detectAttachments((e.body || '') + ' ' + (e.snippet || '')).length > 0).length;

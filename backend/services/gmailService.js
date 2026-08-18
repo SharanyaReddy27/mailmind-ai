@@ -137,6 +137,8 @@ async function syncGmailForUser(user, limit = 20, pageToken = null) {
         /\b(?:pdf|docx?|pptx?|xlsx?|zip|rar|png|jpg|jpeg|gif)\b/i.test(bodyText)
       );
 
+      const isUnread = labelIds.includes('UNREAD');
+
       const emailDoc = {
         userId: user._id,
         source: 'gmail',
@@ -148,7 +150,7 @@ async function syncGmailForUser(user, limit = 20, pageToken = null) {
         subject,
         body: bodyText,
         hasAttachments,
-        unread: labelIds.includes('UNREAD') || !labelIds.includes('READ'),
+        unread: isUnread,
         priority: isImportant ? 'High' : (String(headers.importance || '').toLowerCase() === 'low' ? 'Low' : 'Medium'),
       };
 
@@ -162,8 +164,21 @@ async function syncGmailForUser(user, limit = 20, pageToken = null) {
       }
 
       try {
-        await Email.create(emailDoc);
-        created++;
+        const existing = await Email.findOne({
+          userId: user._id,
+          source: 'gmail',
+          externalMessageId: gm.id,
+        });
+
+        if (existing) {
+          existing.unread = isUnread;
+          existing.gmailLabels = labelIds;
+          await existing.save();
+          skipped++;
+        } else {
+          await Email.create(emailDoc);
+          created++;
+        }
       } catch (err) {
         skipped++;
         console.warn('Skipping duplicate or invalid Gmail message:', err.message);

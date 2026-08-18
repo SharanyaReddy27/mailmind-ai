@@ -18,7 +18,12 @@ function EmailCard({ email }) {
     email.snippet || email.body || email.message || "No email content available.";
   const receivedAt = email.receivedAt || email.date || email.createdAt || "";
   const priority = (email.priority || "Medium").toLowerCase();
-  const isUnread = email.unread || email.isRead === false;
+  const isUnread =
+    typeof email.unread === "boolean"
+      ? email.unread
+      : typeof email.isRead === "boolean"
+      ? !email.isRead
+      : Boolean(email.unread);
   const readStatus = isUnread ? "Unread" : "Read";
   const readingTime = estimateReadingTime(email.body || email.snippet || "");
 
@@ -41,7 +46,7 @@ function EmailCard({ email }) {
   };
 
   return (
-    <article className={`email-card priority-${priority} ${isUnread ? "unread" : ""}`}>
+    <article className={`email-card priority-${priority} ${isUnread ? "unread" : "read"}`}>
       <Link to={`/emails/${email._id}`} className="email-card-link">
         <div className="email-header">
           <div className="email-header-identity">
@@ -72,7 +77,7 @@ function EmailCard({ email }) {
                 Gmail
               </span>
             )}
-            <span className={`status-pill ${readStatus.toLowerCase()}`}>{readStatus}</span>
+            <span className={`status-pill ${isUnread ? "unread" : "read"}`}>{readStatus}</span>
           </div>
         </div>
       </Link>

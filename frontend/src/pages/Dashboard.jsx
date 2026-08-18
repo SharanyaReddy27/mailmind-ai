@@ -78,7 +78,13 @@ function Dashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const unreadCount = emails.filter((email) => email.unread).length;
+    const unreadCount = emails.filter((email) =>
+      typeof email.unread === "boolean"
+        ? email.unread
+        : typeof email.isRead === "boolean"
+        ? !email.isRead
+        : Boolean(email.unread)
+    ).length;
 
     const priorityCounts = PRIORITY_ORDER.reduce((acc, level) => {
       acc[level] = emails.filter((email) => email.priority === level).length;
@@ -251,26 +257,26 @@ function Dashboard() {
       ) : (
         <>
           <div className="stat-grid">
-            <div className="stat-card">
+            <Link to="/inbox?unread=true" className="stat-card stat-card--interactive">
               <MailOpen size={16} strokeWidth={2.25} />
               <span className="stat-value">{stats.unreadCount}</span>
               <span className="stat-label">Unread</span>
-            </div>
-            <div className="stat-card">
+            </Link>
+            <Link to="/inbox?priority=High" className="stat-card stat-card--interactive">
               <Sparkles size={16} strokeWidth={2.25} />
               <span className="stat-value">{stats.priorityCounts.High || 0}</span>
               <span className="stat-label">High priority</span>
-            </div>
-            <div className="stat-card">
+            </Link>
+            <Link to="/inbox?hasTasks=true" className="stat-card stat-card--interactive">
               <CheckSquare size={16} strokeWidth={2.25} />
               <span className="stat-value">{stats.pendingTaskCount}</span>
               <span className="stat-label">Extracted tasks</span>
-            </div>
-            <div className="stat-card">
+            </Link>
+            <Link to="/inbox" className="stat-card stat-card--interactive">
               <Mail size={16} strokeWidth={2.25} />
               <span className="stat-value">{stats.total}</span>
               <span className="stat-label">Total emails</span>
-            </div>
+            </Link>
           </div>
 
           <div className="dashboard-section-grid">
